@@ -1,0 +1,41 @@
+name: finance_app
+description: "Personal finance app — local-first, encrypted, Android. Track spends, see trends, ask questions privately."
+publish_to: 'none'
+resolution: workspace
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.3
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # Local encrypted storage: drift tables, DAOs, and passphrase handling.
+  finance_db:
+    path: ../../packages/finance_db
+
+  # Used directly for query-stream invalidation and companion values in the
+  # repository layer. Declared explicitly rather than relied on transitively.
+  drift: ^2.35.0
+
+  # Charts for the dashboard and trend screens. MIT licensed, no paid tier.
+  fl_chart: ^1.2.0
+
+  # Currency, date, and number formatting. INR grouping is not something to
+  # hand-roll: Indian digit grouping (1,23,456.78) differs from Western.
+  intl: ^0.20.3
+
+  # Collision-resistant primary keys for user-created rows.
+  uuid: ^4.6.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

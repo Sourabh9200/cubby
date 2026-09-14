@@ -1,0 +1,30 @@
+# Dart / Flutter
+.dart_tool/
+.packages
+build/
+
+# pubspec.lock is deliberately NOT ignored. This is an application (a pub
+# workspace with `publish_to: none`), not a published library, so the resolved
+# versions of every dependency are part of the build. Committing it is what makes
+# a build here reproducible, and what stops CI from resolving a different graph
+# than the one that was tested.
+
+# Never commit secrets. API keys are read from --dart-define or
+# flutter_secure_storage at runtime, never from the repo.
+config.json
+*.jks
+*.keystore
+key.properties
+.env
+
+# Machine-specific: absolute paths to the Flutter and Android SDKs.
+# Also covered by apps/finance_app/android/.gitignore.
+local.properties
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# macOS
+.DS_Store

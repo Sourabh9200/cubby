@@ -1,0 +1,39 @@
+name: finance_db
+description: >-
+  Local encrypted storage for the finance app: drift tables, DAOs, migrations,
+  and the passphrase handling that keys SQLite3MultipleCiphers.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.13.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # drift is a typed layer over SQLite, not an ORM that hides SQL: custom
+  # queries and window functions stay available, which the aggregation screens
+  # depend on.
+  drift: ^2.35.0
+
+  # Bundles the native SQLite library. Note: the older `sqlite3_flutter_libs`
+  # and `sqlcipher_flutter_libs` shims are both end-of-life now; the native
+  # build hooks in `sqlite3` 3.x replace them.
+  sqlite3: ^3.5.2
+
+  path: ^1.9.0
+  path_provider: ^2.1.6
+
+  # Stores the database passphrase in the Android Keystore rather than in
+  # SharedPreferences, so a rooted-device file read does not yield the key.
+  flutter_secure_storage: ^11.1.1
+
+  uuid: ^4.6.0
+
+dev_dependencies:
+  drift_dev: ^2.35.0
+  build_runner: ^2.16.1
+  flutter_test:
+    sdk: flutter

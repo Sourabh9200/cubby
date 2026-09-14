@@ -1,0 +1,21 @@
+name: finance_assistant
+description: >-
+  Privacy boundary for LLM calls: reversible PII redaction, context
+  sanitization (amount bucketing, k-anonymity), and an egress guard.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.13.0
+
+# INTENTIONALLY ZERO RUNTIME DEPENDENCIES.
+#
+# This package is a trust boundary. Every third-party dependency inside it
+# would be code with the ability to see pre-redaction financial data.
+# Keeping it dependency-free means the entire audit surface is in this repo,
+# and it runs identically on Dart VM, Flutter, and in CI with no plugins.
+dependencies: {}
+
+dev_dependencies:
+  test: ^1.25.0

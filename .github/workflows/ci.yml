@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  # Pinned rather than tracking `stable`, so a Flutter release cannot turn the
+  # build red without a commit here. This is the version the workspace is
+  # developed and verified against.
+  FLUTTER_VERSION: 3.47.4
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Flutter, not just Dart. Two of the three packages depend on the Flutter
+      # SDK, so `dart pub get` cannot resolve this workspace at all.
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # Formatting and analysis are gated separately from tests so that a
+      # failure message points at the actual problem. All three are free on the
+      # GitHub Actions free tier for public repositories.
+      - name: Verify formatting
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Analyze
+        run: flutter analyze --fatal-infos
+
+      # The suites are run explicitly, one per package. `dart test` at the
+      # repository root runs NOTHING: the root is a pub workspace, not a package,
+      # so it has no test/ directory. That quietly tested zero tests until this
+      # was written out package by package.
+      #
+      # This suite is the point of the pipeline. A red test here means a canary
+      # reached a payload, which is a release blocker.
+      - name: finance_assistant — privacy boundary and PII detectors
+        working-directory: packages/finance_assistant
+        run: dart test --reporter expanded
+
+      - name: finance_db — schema, migrations, aggregates
+        working-directory: packages/finance_db
+        run: flutter test
+
+      - name: finance_app — UI behaviour and end-to-end flows
+        working-directory: apps/finance_app
+        run: flutter test
+
+      # Note: this pipeline does NOT build the APK. Gradle packaging and the
+      # native SQLite3MultipleCiphers link are exercised on a device only, so a
+      # packaging break would reach a phone before CI noticed.

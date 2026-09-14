@@ -1,0 +1,24 @@
+name: finance_app_workspace
+description: Personal finance app — pub workspace root. Android-first, local-first, encrypted-at-rest.
+publish_to: none
+
+environment:
+  sdk: ^3.13.0
+
+# Encryption for the SQLite database.
+#
+# `source: sqlite3mc` makes the sqlite3 build hook link SQLite3MultipleCiphers
+# instead of stock SQLite, which is what provides `PRAGMA key`. This has to be
+# declared where the native library is actually built.
+hooks:
+  user_defines:
+    sqlite3:
+      source: sqlite3mc
+
+# Pub workspace: every package below shares one lockfile and one resolved
+# dependency graph. This is what lets finance_assistant stay provably
+# isolated from finance_db (see packages/finance_assistant/README.md).
+workspace:
+  - packages/finance_assistant
+  - packages/finance_db
+  - apps/finance_app
