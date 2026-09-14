@@ -247,11 +247,14 @@ void main() {
       find.descendant(of: recurring, matching: find.text('Rent · ₹18,000')),
       findsOneWidget,
     );
-    // The day is spelled the way a rent is described, not as a raw number.
+    // The day is spelled the way a rent is described, not as a raw number, and
+    // the annual cost sits beside it: ₹18,000 a month is ₹2.2L a year (Tier 1.3).
     expect(
       find.descendant(
         of: recurring,
-        matching: find.text('Every month on the 13th · next 13 Oct'),
+        matching: find.text(
+          'Every month on the 13th · ₹2.2L a year · next 13 Oct',
+        ),
       ),
       findsOneWidget,
     );

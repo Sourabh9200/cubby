@@ -6,14 +6,21 @@ import '../../core/widgets/charts/cumulative_line_chart.dart';
 import '../../core/widgets/indicators.dart';
 import '../../core/widgets/period_selector_bar.dart';
 import '../../core/widgets/section_card.dart';
+import '../../data/budget_pace.dart';
 import '../../data/period_views.dart';
 import '../../data/repository_scope.dart';
+import '../../data/scheduled_views.dart';
+import '../../data/snapshot_analytics.dart';
 import '../../data/snapshot_views.dart';
 import '../../data/stats_period.dart';
+import '../../data/suggested_limit.dart';
 import '../budgets/budgets_screen.dart';
 import 'widgets/biggest_hits_card.dart';
 import 'widgets/budget_row.dart';
 import 'widgets/category_donut.dart';
+import 'widgets/committed_spend_card.dart';
+import 'widgets/composition_card.dart';
+import 'widgets/projection_line.dart';
 
 /// At-a-glance screen, for a week, a month, a quarter or a year.
 ///
@@ -54,13 +61,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final investedTotal = totals.investmentMinor;
     final investedRate = totals.investmentRate;
     final investingTargets = snapshot.investmentTargetsIn(range);
+    // The projection is computed for every period and *shown* only where it has a
+    // basis: a period that is over returns null, and a ledger with no history
+    // behind it returns a figure with no basis, which is the app's way of saying
+    // "not enough history" rather than inventing one (C5, C11).
+    final projection = snapshot.projectionFor(range);
+    final budgetLimit = snapshot.budgetLimitIn(range);
+    // Where each limit is heading, by category name. Only the categories whose
+    // pace is a problem say anything on screen; the rest keep the row they had.
+    final paces = <String, BudgetPace>{
+      for (final pace in snapshot.budgetPaceIn(range)) pace.category: pace,
+    };
+    final suggestions = <String, SuggestedLimit>{
+      for (final suggestion in snapshot.suggestedLimits())
+        suggestion.category: suggestion,
+    };
 
-    DateTime? earliest;
-    for (final txn in snapshot.transactions) {
-      if (earliest == null || txn.date.isBefore(earliest)) {
-        earliest = txn.date;
-      }
-    }
+    final earliest = snapshot.firstRecordedDay;
 
     return CustomScrollView(
       slivers: <Widget>[
@@ -166,8 +183,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
+                    if (projection != null && projection.hasBasis) ...<Widget>[
+                      const SizedBox(height: 6),
+                      const Divider(height: 1),
+                      ProjectionLine(
+                        projection: projection,
+                        budgetLimitMinor: budgetLimit,
+                        word: word,
+                      ),
+                    ],
                   ],
                 ),
+              ),
+              const SizedBox(height: 14),
+              CompositionCard(
+                totals: snapshot.compositionFor(range),
+                period: range.period,
+                word: word,
               ),
               const SizedBox(height: 14),
               SectionCard(
@@ -300,6 +332,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               padding: const EdgeInsets.only(bottom: 16),
                               child: BudgetRow(
                                 budget: budget,
+                                pace: paces[budget.category],
                                 onTap: () {
                                   final category = snapshot.categoryNamed(
                                     budget.category,
@@ -309,6 +342,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       context,
                                       category: category,
                                       spentMinor: budget.spentMinor,
+                                      pace: paces[budget.category],
+                                      suggestion: suggestions[budget.category],
                                     );
                                   }
                                 },
@@ -316,6 +351,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                         ],
                       ),
+              ),
+              const SizedBox(height: 14),
+              CommittedSpendCard(
+                committedExpenseMinor: snapshot.committedMonthlyMinor,
+                committedInvestmentMinor: snapshot.committedInvestmentMinor,
+                dues: snapshot.upcomingDues(),
+                incomeMinor: snapshot.currentMonth.incomeMinor,
               ),
               const SizedBox(height: 14),
               SectionCard(
@@ -331,11 +373,3 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 }
-
-/// How a period is named in a sentence: "Spent this week", "vs last quarter".
-String periodWord(StatsPeriod period) => switch (period) {
-  StatsPeriod.week => 'week',
-  StatsPeriod.month => 'month',
-  StatsPeriod.quarter => 'quarter',
-  StatsPeriod.year => 'year',
-};

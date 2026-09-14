@@ -7,23 +7,33 @@ import 'package:flutter/foundation.dart';
 /// A rolling window would be defensible for a chart and wrong for a ledger: two
 /// entries on either side of a boundary would move between periods as the days
 /// passed, and a total that changes without a new entry is a total nobody trusts.
+///
+/// [custom] is the one exception, and it is the user's own choice rather than a
+/// rolling window: the bounds are two civil dates they picked, and stepping moves
+/// them by the span's own length.
 enum StatsPeriod {
+  day,
   week,
   month,
   quarter,
-  year;
+  year,
+  custom;
 
   /// How many months this period covers, for scaling a monthly budget.
   ///
-  /// Zero for a week, which contains no whole month. That zero is what stops the
-  /// overview from drawing a weekly bar against a monthly limit: scaling 31 days
-  /// down to 7 is arithmetic that looks precise and is simply wrong, and a
-  /// budget bar that is wrong is worse than no bar.
+  /// Zero for a day or a week, which contain no whole month, and zero for a
+  /// custom range, whose span is not a whole number of months by construction.
+  /// That zero is what stops a report from drawing a monthly limit stretched
+  /// over a span nobody agreed to: scaling 31 days down to 7 is arithmetic that
+  /// looks precise and is simply wrong, and a budget bar that is wrong is worse
+  /// than no bar. The screen says why instead.
   int get monthsCovered => switch (this) {
+    StatsPeriod.day => 0,
     StatsPeriod.week => 0,
     StatsPeriod.month => 1,
     StatsPeriod.quarter => 3,
     StatsPeriod.year => 12,
+    StatsPeriod.custom => 0,
   };
 }
 
@@ -49,9 +59,19 @@ class StatsRange {
   final DateTime to;
 
   /// The period of [period] that contains [day].
+  ///
+  /// A [StatsPeriod.custom] range has no canonical instance containing a day —
+  /// callers that offer one build their own bounds with [StatsRange.custom]. The
+  /// single day is the only honest answer here, and no screen reaches it.
   static StatsRange containing(StatsPeriod period, DateTime day) {
     final date = DateTime(day.year, day.month, day.day);
     switch (period) {
+      case StatsPeriod.day:
+        return StatsRange(
+          period: period,
+          from: date,
+          to: DateTime(date.year, date.month, date.day + 1),
+        );
       case StatsPeriod.week:
         // Monday, because that is the first day of a week in India and the app
         // is INR-only. `weekday` is 1 for Monday, so this never shifts a Monday.
@@ -80,8 +100,26 @@ class StatsRange {
           from: DateTime(date.year),
           to: DateTime(date.year + 1),
         );
+      case StatsPeriod.custom:
+        return StatsRange(
+          period: period,
+          from: date,
+          to: DateTime(date.year, date.month, date.day + 1),
+        );
     }
   }
+
+  /// A range the user chose: [from] inclusive, [to] exclusive.
+  ///
+  /// The only range whose bounds are not derived from a calendar unit. Callers
+  /// that take a day from a date picker must add a day to it for [to], so that
+  /// the end date the user tapped is included in the report.
+  static StatsRange custom({required DateTime from, required DateTime to}) =>
+      StatsRange(
+        period: StatsPeriod.custom,
+        from: DateTime(from.year, from.month, from.day),
+        to: DateTime(to.year, to.month, to.day),
+      );
 
   /// The same period [count] periods earlier or later.
   ///
@@ -89,6 +127,13 @@ class StatsRange {
   /// on a Monday and a quarter starting in April whatever the current day is.
   StatsRange step(int count) {
     switch (period) {
+      case StatsPeriod.day:
+        final start = DateTime(from.year, from.month, from.day + count);
+        return StatsRange(
+          period: period,
+          from: start,
+          to: DateTime(start.year, start.month, start.day + 1),
+        );
       case StatsPeriod.week:
         final start = DateTime(from.year, from.month, from.day + 7 * count);
         return StatsRange(
@@ -114,8 +159,30 @@ class StatsRange {
           from: DateTime(from.year + count),
           to: DateTime(from.year + count + 1),
         );
+      case StatsPeriod.custom:
+        // Shifted by its own length, so "the previous period" for a range the
+        // user chose is the same number of days immediately before it — the only
+        // comparison that holds the span length constant.
+        final days = to.difference(from).inDays * count;
+        return StatsRange(
+          period: period,
+          from: DateTime(from.year, from.month, from.day + days),
+          to: DateTime(to.year, to.month, to.day + days),
+        );
     }
   }
+
+  /// The same window one year earlier.
+  ///
+  /// Calendar arithmetic rather than 365 days, so a month lands on the same
+  /// month and a leap year cannot drift the window by a day. Used by the
+  /// year-over-year comparison, which is the one comparison that steps twelve
+  /// months instead of one period.
+  StatsRange oneYearEarlier() => StatsRange(
+    period: period,
+    from: DateTime(from.year - 1, from.month, from.day),
+    to: DateTime(to.year - 1, to.month, to.day),
+  );
 
   /// True when [date] falls inside the range. [to] is excluded.
   bool contains(DateTime date) {

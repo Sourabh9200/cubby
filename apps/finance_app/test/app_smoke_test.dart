@@ -19,12 +19,38 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // A brand-new install has no entries, so the headline is ₹0 and the donut
-    // shows an empty state — not a crash and not a blank panel.
+    // A brand-new install has no entries, so the headline is ₹0 and every card
+    // below it shows an empty state — not a crash and not a blank panel.
     expect(find.textContaining('Spent this month'), findsOneWidget);
     expect(find.text('Spending pace'), findsOneWidget);
+    expect(find.text('Composition'), findsOneWidget);
+    expect(find.text('Nothing recorded this month'), findsOneWidget);
+
+    // The cards below sit under the fold, so each is scrolled to. The scrollable
+    // is named by axis: the overview's period chips are a horizontal ListView,
+    // which is a Scrollable too.
+    final overview = find.byWidgetPredicate(
+      (widget) =>
+          widget is Scrollable && widget.axisDirection == AxisDirection.down,
+    );
+
+    await tester.scrollUntilVisible(
+      find.text('Where it went'),
+      300,
+      scrollable: overview,
+    );
+    await tester.pumpAndSettle();
     expect(find.text('Where it went'), findsOneWidget);
     expect(find.text('No spending yet'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Already spoken for'),
+      300,
+      scrollable: overview,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Already spoken for'), findsOneWidget);
+    expect(find.text('Nothing repeats yet'), findsOneWidget);
 
     for (final label in <String>[
       'Overview',

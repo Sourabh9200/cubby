@@ -50,7 +50,8 @@ device does not yield the key. `InMemoryPassphraseStore` exists for tests.
 
 ## Schema
 
-Four tables: `accounts`, `categories`, `transactions`, `settings_entries`.
+Five tables: `accounts`, `categories`, `transactions`, `recurring_rules`,
+`settings_entries`.
 
 Decisions worth not undoing:
 

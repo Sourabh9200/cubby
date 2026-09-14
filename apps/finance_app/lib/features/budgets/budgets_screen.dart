@@ -4,9 +4,12 @@ import '../../core/format/money.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/indicators.dart';
 import '../../core/widgets/section_card.dart';
+import '../../data/budget_pace.dart';
 import '../../data/models.dart';
 import '../../data/repository_scope.dart';
+import '../../data/snapshot_analytics.dart';
 import '../../data/snapshot_views.dart';
+import '../../data/suggested_limit.dart';
 import 'widgets/budget_category_tile.dart';
 import 'widgets/budget_editor_sheet.dart';
 import 'widgets/category_editor_sheet.dart';
@@ -42,6 +45,16 @@ class BudgetsScreen extends StatelessWidget {
         .where((category) => category.budgetMinor > 0)
         .fold(0, (sum, category) => sum + (spend[category.name] ?? 0));
     final remaining = budgeted - spentAgainstBudgets;
+    // The two deeper figures, by category name: where each limit is heading at
+    // the pace being spent, and what the user's own months suggest. Both are
+    // read here once and looked up per row, rather than recomputed per tile.
+    final paces = <String, BudgetPace>{
+      for (final pace in snapshot.budgetPace()) pace.category: pace,
+    };
+    final suggestions = <String, SuggestedLimit>{
+      for (final suggestion in snapshot.suggestedLimits())
+        suggestion.category: suggestion,
+    };
 
     return Scaffold(
       appBar: AppBar(
@@ -103,10 +116,13 @@ class BudgetsScreen extends StatelessWidget {
                   BudgetCategoryTile(
                     category: category,
                     spentMinor: spend[category.name] ?? 0,
+                    pace: paces[category.name],
                     onTap: () => editBudget(
                       context,
                       category: category,
                       spentMinor: spend[category.name] ?? 0,
+                      pace: paces[category.name],
+                      suggestion: suggestions[category.name],
                     ),
                   ),
               ],
@@ -214,11 +230,15 @@ class BudgetsScreen extends StatelessWidget {
 /// Opens the budget editor for [category].
 ///
 /// A plain function so both this screen and the dashboard's budget card can call
-/// it without duplicating the sheet wiring.
+/// it without duplicating the sheet wiring. [pace] and [suggestion] are the deeper
+/// Tier 1 figures, both optional: a sheet with neither is exactly the sheet this
+/// app shipped before there was anything extra to say.
 Future<void> editBudget(
   BuildContext context, {
   required Category category,
   required int spentMinor,
+  BudgetPace? pace,
+  SuggestedLimit? suggestion,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -229,6 +249,8 @@ Future<void> editBudget(
       categoryName: category.name,
       currentBudgetMinor: category.budgetMinor,
       spentMinor: spentMinor,
+      pace: pace,
+      suggestion: suggestion,
     ),
   );
 }

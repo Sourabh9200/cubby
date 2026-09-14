@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/format/money.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/indicators.dart';
+import '../../../data/budget_pace.dart';
 import '../../../data/models.dart';
 
 /// One category's budget row, tappable to edit.
@@ -11,11 +12,17 @@ class BudgetCategoryTile extends StatelessWidget {
     required this.category,
     required this.spentMinor,
     required this.onTap,
+    this.pace,
     super.key,
   });
 
   final Category category;
   final int spentMinor;
+
+  /// Where this category lands at the pace it has been spent, when that pace
+  /// takes it past its limit.
+  final BudgetPace? pace;
+
   final VoidCallback onTap;
 
   @override
@@ -39,7 +46,17 @@ class BudgetCategoryTile extends StatelessWidget {
         ? '${Money.format(spentMinor, decimals: false)} $verb · no $unit set'
         : 'No $unit set';
 
-    final footer = isTarget
+    // "Heading for" is only worth saying while there is still time to act, and
+    // only when the pace is a problem: a category comfortably inside its limit
+    // reads exactly as it did before.
+    final pace = this.pace;
+    final projectedOver =
+        pace != null && pace.isProjectedOver && !isTarget && !over;
+
+    final footer = projectedOver
+        ? 'Heading for ${Money.format(pace.projectedMinor, decimals: false)} · '
+              '${Money.format(pace.safePerDayMinor)} a day keeps it inside'
+        : isTarget
         ? (over
               ? 'Target met · '
                     '${Money.format(spentMinor - budget, decimals: false)} over'
@@ -49,6 +66,14 @@ class BudgetCategoryTile extends StatelessWidget {
               ? 'Over by ${Money.format(spentMinor - budget, decimals: false)}'
               : '${Money.format(budget - spentMinor, decimals: false)} left '
                     'this month');
+
+    final footerColor = isTarget && over
+        ? money.income
+        : over
+        ? money.expense
+        : projectedOver
+        ? money.warning
+        : theme.colorScheme.onSurfaceVariant;
 
     return InkWell(
       onTap: onTap,
@@ -102,12 +127,8 @@ class BudgetCategoryTile extends StatelessWidget {
               Text(
                 footer,
                 style: theme.textTheme.labelSmall?.copyWith(
-                  color: isTarget && over
-                      ? money.income
-                      : over
-                      ? money.expense
-                      : theme.colorScheme.onSurfaceVariant,
-                  fontWeight: over ? FontWeight.w700 : null,
+                  color: footerColor,
+                  fontWeight: over || projectedOver ? FontWeight.w700 : null,
                 ),
               ),
             ],

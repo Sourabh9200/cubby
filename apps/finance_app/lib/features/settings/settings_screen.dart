@@ -4,7 +4,10 @@ import '../../core/format/money.dart';
 import '../../core/widgets/indicators.dart';
 import '../../core/widgets/section_card.dart';
 import '../../data/models.dart';
+import '../../data/recurring_candidate.dart';
 import '../../data/repository_scope.dart';
+import '../../data/scheduled_views.dart';
+import '../../data/snapshot_analytics.dart';
 import '../../data/snapshot_views.dart';
 import '../budgets/budgets_screen.dart';
 import 'widgets/action_tile.dart';
@@ -161,12 +164,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Whether the user has waved this session's rule suggestions away.
+  ///
+  /// Held in state rather than persisted: a proposal is a nudge, and one that
+  /// came back every time the app opened would be nagging. Adding the rule is
+  /// what makes it stop for good, because the payee then has one.
+  bool _hideCandidates = false;
+
+  /// Creates the rule a [RecurringCandidate] proposes.
+  ///
+  /// Anchored on the candidate's last occurrence, which is the entry the rule
+  /// continues from — so any month between then and today is posted, exactly as
+  /// recording a back-dated entry with Repeat switched on does.
+  Future<void> _addRule(RecurringCandidate candidate) async {
+    setState(() => _busy = true);
+    final repository = RepositoryScope.actions(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await repository.addRecurringRule(
+        accountId: candidate.accountId,
+        categoryId: candidate.categoryId,
+        amountMinor: candidate.typicalAmountMinor,
+        direction: candidate.direction,
+        startedOn: candidate.lastDate,
+        payee: candidate.payee,
+      );
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            '${candidate.payee} will repeat monthly from next month.',
+          ),
+        ),
+      );
+    } on Object catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not add the rule: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final snapshot = RepositoryScope.of(context);
     final sampleCount = snapshot.sampleTransactionCount;
     final ownCount = snapshot.ownTransactionCount;
+    // Proposals from the user's own ledger, and the annual cost of each live
+    // rule. Both are read here once rather than inside the rows.
+    final candidates = _hideCandidates
+        ? const <RecurringCandidate>[]
+        : snapshot.recurringCandidates();
+    final annualByRule = <String, int>{
+      for (final subscription in snapshot.subscriptions)
+        subscription.ruleId: subscription.annualMinor,
+    };
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
@@ -225,6 +280,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         const SizedBox(height: 14),
+        if (!_hideCandidates && candidates.isNotEmpty) ...<Widget>[
+          SectionCard(
+            title: 'Looks recurring',
+            trailing: TextButton(
+              onPressed: () => setState(() => _hideCandidates = true),
+              child: const Text('Not now'),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                for (final candidate in candidates)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: CategoryAvatar(
+                      category: candidate.category,
+                      size: 38,
+                    ),
+                    title: Text(
+                      '${candidate.payee} · '
+                      '${Money.format(candidate.typicalAmountMinor, decimals: false)}',
+                    ),
+                    subtitle: Text(
+                      '${candidate.occurrences} entries about a month apart · '
+                      'last ${DateLabels.dayMonth(candidate.lastDate)}',
+                    ),
+                    trailing: TextButton(
+                      onPressed: _busy ? null : () => _addRule(candidate),
+                      child: const Text('Add monthly'),
+                    ),
+                  ),
+                const SizedBox(height: 4),
+                Text(
+                  'Suggested because the same payee, for about the same amount, '
+                  'appears three or more times roughly thirty days apart. Two '
+                  'payments to the same shop on the same day each month look '
+                  'like this too, so nothing repeats until you say so.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+        ],
         SectionCard(
           title: 'Recurring',
           trailing: Text(
@@ -259,6 +359,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         subtitle: Text(
                           'Every month on the ${_dayOrdinal(rule.dayOfMonth)}'
+                          ' · ${Money.compact(annualByRule[rule.id] ?? 0)} a year'
                           ' · next ${DateLabels.dayMonth(rule.nextDueOn)}',
                         ),
                         trailing: IconButton(
@@ -268,6 +369,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ),
                     const SizedBox(height: 4),
+                    // The annual figure is the one that makes anyone act: "₹499
+                    // a month" is not a decision, "₹5,988 a year" is (Tier 1.3).
+                    Text(
+                      '${Money.compact(snapshot.annualSubscriptionsMinor)} a '
+                      'year in recurring spending.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     Text(
                       'An entry is posted when its day arrives, including for '
                       'months the app was not opened. Stopping a rule leaves '
@@ -293,6 +404,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'Encrypted backup and restore',
             'Budget alerts as notifications',
             'Unlock with fingerprint or PIN',
+            // The next tier of the analytics plan: these need new tables, so
+            // they are named here rather than half-built (docs/analytics.md).
+            'Savings goals',
+            'Tags on entries',
+            'Weekly and yearly recurrence',
           ],
         ),
         const SizedBox(height: 20),

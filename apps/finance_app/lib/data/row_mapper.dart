@@ -73,6 +73,7 @@ abstract final class RowMapper {
         name: row.name,
         type: row.type.name,
         balanceMinor: row.balanceMinor,
+        openingBalanceMinor: row.openingBalanceMinor,
       );
 
   /// Groups trend points into `YYYY-MM` to category name to total, keeping only

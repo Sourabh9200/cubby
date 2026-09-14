@@ -1,6 +1,7 @@
 import 'package:finance_db/finance_db.dart' show SeedIds;
 
 import 'account_balance.dart';
+import 'budget_pace.dart';
 import 'finance_snapshot.dart';
 import 'models.dart';
 import 'period_views.dart';
@@ -49,6 +50,14 @@ extension SnapshotViews on FinanceSnapshot {
       investmentTargetsIn(
         StatsRange.containing(StatsPeriod.month, month ?? currentMonth.month),
       );
+
+  /// Spending limits read at the pace [month] has actually been spent.
+  ///
+  /// An adapter onto [PeriodViews.budgetPaceIn], and the month-shaped twin of the
+  /// period view so the budget screens ask one question in one way.
+  List<BudgetPace> budgetPace({DateTime? month}) => budgetPaceIn(
+    StatsRange.containing(StatsPeriod.month, month ?? currentMonth.month),
+  );
 
   /// Amount invested per category for [month], largest first.
   ///

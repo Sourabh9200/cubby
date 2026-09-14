@@ -7,6 +7,7 @@ import '../../../core/widgets/section_card.dart';
 import '../../../data/finance_snapshot.dart';
 import '../../../data/models.dart';
 import '../../../data/snapshot_views.dart';
+import '../net_worth_screen.dart';
 
 /// What went into investments this month, and how much of income that was.
 ///
@@ -32,15 +33,21 @@ class InvestingCard extends StatelessWidget {
     final byCategory = snapshot.investedByCategory(month);
 
     if (total == 0) {
-      return const SectionCard(
+      return SectionCard(
         title: 'Investing',
-        child: EmptyState(
-          dense: true,
-          icon: Icons.savings_outlined,
-          title: 'Nothing invested this month',
-          message:
-              'Record a contribution against an investing category and it '
-              'appears here, kept apart from your spending.',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            const EmptyState(
+              dense: true,
+              icon: Icons.savings_outlined,
+              title: 'Nothing invested this month',
+              message:
+                  'Record a contribution against an investing category and it '
+                  'appears here, kept apart from your spending.',
+            ),
+            const _NetWorthLink(),
+          ],
         ),
       );
     }
@@ -82,7 +89,31 @@ class InvestingCard extends StatelessWidget {
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
+          const _NetWorthLink(),
         ],
+      ),
+    );
+  }
+}
+
+/// The one link to the net-worth screen.
+///
+/// A link rather than a card: net worth is a deep view the user opens when they
+/// want it, and the trends screen is already long. It lives here because this
+/// card is about money moved into assets, which is half of what net worth is.
+class _NetWorthLink extends StatelessWidget {
+  const _NetWorthLink();
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        onPressed: () => Navigator.of(
+          context,
+        ).push(MaterialPageRoute<void>(builder: (_) => const NetWorthScreen())),
+        icon: const Icon(Icons.show_chart_rounded, size: 18),
+        label: const Text('Net worth, at cost'),
       ),
     );
   }

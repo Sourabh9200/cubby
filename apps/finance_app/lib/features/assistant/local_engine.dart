@@ -1,7 +1,10 @@
 import '../../core/format/money.dart';
-import '../../data/snapshot_analytics.dart';
 import '../../data/finance_snapshot.dart';
+import '../../data/period_views.dart';
+import '../../data/scheduled_views.dart';
+import '../../data/snapshot_analytics.dart';
 import '../../data/snapshot_views.dart';
+import '../../data/stats_period.dart';
 import 'assistant_reply.dart';
 import 'intent_matcher.dart';
 
@@ -32,6 +35,12 @@ class LocalEngine {
     'What was my biggest expense?',
     'How does this compare to my average?',
     'What is my savings rate?',
+    // The deeper Tier 1 answers, reachable by asking rather than by a card on a
+    // screen: the assistant is where an opt-in figure belongs.
+    'Will I stay within budget this month?',
+    'What repeats every month?',
+    'Which shops did I spend the most at?',
+    'How does this month compare with last year?',
   ];
 
   /// Answers [question] from local data only.
@@ -45,6 +54,10 @@ class LocalEngine {
       AssistantIntent.biggestExpense => biggestExpense(),
       AssistantIntent.comparison => comparison(),
       AssistantIntent.savingsRate => savingsRate(),
+      AssistantIntent.forecast => forecast(),
+      AssistantIntent.subscriptions => subscriptions(),
+      AssistantIntent.payees => payees(),
+      AssistantIntent.yearOverYear => yearOverYear(),
       AssistantIntent.fallback => fallback(),
     };
   }

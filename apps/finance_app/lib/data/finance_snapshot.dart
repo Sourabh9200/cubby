@@ -87,6 +87,21 @@ class FinanceSnapshot {
   /// True when there is nothing recorded at all.
   bool get isEmpty => transactions.isEmpty;
 
+  /// The earliest day with an entry, or null when nothing is recorded.
+  ///
+  /// Bounds the period stepper, which must not wander into periods with nothing
+  /// in them, and decides whether a year-over-year comparison has a year to
+  /// compare against at all (C7).
+  DateTime? get firstRecordedDay {
+    DateTime? first;
+    for (final txn in transactions) {
+      if (first == null || txn.date.isBefore(first)) {
+        first = txn.date;
+      }
+    }
+    return first == null ? null : DateTime(first.year, first.month, first.day);
+  }
+
   /// The month in progress.
   ///
   /// Returns a zeroed summary rather than null when the ledger is empty, so

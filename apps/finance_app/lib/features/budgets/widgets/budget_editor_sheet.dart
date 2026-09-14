@@ -3,20 +3,26 @@ import 'package:flutter/material.dart';
 import '../../../core/format/amount_entry.dart';
 import '../../../core/format/money.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../data/budget_pace.dart';
 import '../../../data/repository_scope.dart';
+import '../../../data/suggested_limit.dart';
 import '../../transactions/widgets/amount_field.dart';
 import '../../transactions/widgets/numeric_keypad.dart';
 
 /// Sets or clears a category's recurring monthly budget.
 ///
 /// Shares the amount field and numeric pad with the quick-add sheet, so entering
-/// a budget feels identical to entering a transaction.
+/// a budget feels identical to entering a transaction — and it is where the
+/// deeper Tier 1 figures belong, because a limit is the decision they are about:
+/// where this category's pace lands, and what the user's own history suggests.
 class BudgetEditorSheet extends StatefulWidget {
   const BudgetEditorSheet({
     required this.categoryId,
     required this.categoryName,
     required this.currentBudgetMinor,
     this.spentMinor = 0,
+    this.pace,
+    this.suggestion,
     super.key,
   });
 
@@ -27,6 +33,13 @@ class BudgetEditorSheet extends StatefulWidget {
   /// Spend so far this month, shown so the user sets a budget with the actual
   /// number in front of them rather than from memory.
   final int spentMinor;
+
+  /// Where this category lands at the pace it has been spent, when that takes it
+  /// past its limit.
+  final BudgetPace? pace;
+
+  /// A limit derived from the user's own months, offered but never applied.
+  final SuggestedLimit? suggestion;
 
   @override
   State<BudgetEditorSheet> createState() => _BudgetEditorSheetState();
@@ -102,6 +115,19 @@ class _BudgetEditorSheetState extends State<BudgetEditorSheet> {
             ),
             const SizedBox(height: 14),
             AmountField(typed: _entry.text),
+            if (widget.pace case final BudgetPace pace
+                when pace.isProjectedOver) ...<Widget>[
+              const SizedBox(height: 8),
+              Text(
+                'At this pace you land at '
+                '${Money.format(pace.projectedMinor, decimals: false)} · '
+                '${Money.format(pace.overshootMinor, decimals: false)} over',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: MoneyColors.of(context).warning,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
             if (overBudget) ...<Widget>[
               const SizedBox(height: 8),
               Text(
@@ -110,6 +136,44 @@ class _BudgetEditorSheetState extends State<BudgetEditorSheet> {
                 style: theme.textTheme.labelMedium?.copyWith(
                   color: MoneyColors.of(context).expense,
                   fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+            if (widget.suggestion
+                case final SuggestedLimit suggestion) ...<Widget>[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: <Widget>[
+                  ActionChip(
+                    label: Text(
+                      'Use ${Money.format(suggestion.suggestedMinor, decimals: false)}'
+                      ' · your median',
+                    ),
+                    onPressed: () => setState(
+                      () => _entry.setMinor(suggestion.suggestedMinor),
+                    ),
+                  ),
+                  if (suggestion.hasSpread)
+                    ActionChip(
+                      label: Text(
+                        'Use ${Money.format(suggestion.p90Minor, decimals: false)}'
+                        ' · your busiest',
+                      ),
+                      onPressed: () =>
+                          setState(() => _entry.setMinor(suggestion.p90Minor)),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'From the ${suggestion.monthsRecorded} months you recorded '
+                '${widget.categoryName}. A figure read off your own spending is '
+                'a suggestion, not a budget you agreed to — setting it is your '
+                'decision.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
             ],

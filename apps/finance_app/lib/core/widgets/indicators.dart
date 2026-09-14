@@ -123,6 +123,36 @@ class Pill extends StatelessWidget {
   }
 }
 
+/// A colour swatch with a label, for chart legends.
+///
+/// Shared rather than re-declared per chart so every legend in the app reads the
+/// same: the swatch size, radius and gap are decided once.
+class LegendDot extends StatelessWidget {
+  const LegendDot({required this.color, required this.label, super.key});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(label, style: Theme.of(context).textTheme.labelMedium),
+      ],
+    );
+  }
+}
+
 /// Empty-state placeholder so no screen ever renders as a blank void.
 class EmptyState extends StatelessWidget {
   const EmptyState({

@@ -3,13 +3,21 @@ import 'package:flutter/material.dart';
 import '../../../core/format/money.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/indicators.dart';
+import '../../../data/budget_pace.dart';
 import '../../../data/models.dart';
 
 /// One budget: spent vs limit, with a bar and a plain-language status.
 class BudgetRow extends StatelessWidget {
-  const BudgetRow({required this.budget, this.onTap, super.key});
+  const BudgetRow({required this.budget, this.pace, this.onTap, super.key});
 
   final BudgetStatus budget;
+
+  /// Where this category lands at the pace it has been spent, when it is heading
+  /// past its limit. Null for a period that is over, or one with no pace yet.
+  ///
+  /// It replaces the "left" figure rather than adding a line, so a row that is
+  /// merely doing fine looks exactly as it always did.
+  final BudgetPace? pace;
 
   /// Opens the budget editor. Optional so the row still renders in a read-only
   /// context.
@@ -47,6 +55,12 @@ class BudgetRow extends StatelessWidget {
         : isTarget
         ? '${Money.format(budget.remainingMinor, decimals: false)} to go'
         : '${Money.format(budget.remainingMinor, decimals: false)} left';
+
+    final pace = this.pace;
+    // One line, and only when the pace is a problem: what it is heading for is
+    // more useful than what is nominally left, which is the figure that reads as
+    // reassuring right up until the month is over.
+    final projectedOver = pace != null && pace.isProjectedOver && !isTarget;
 
     final statusColor = isTarget
         ? (isOver ? money.income : theme.colorScheme.onSurfaceVariant)
@@ -108,7 +122,16 @@ class BudgetRow extends StatelessWidget {
                 ),
               ),
             ),
-            if (remainingText != null)
+            if (projectedOver)
+              Text(
+                'heading for '
+                '${Money.format(pace.projectedMinor, decimals: false)}',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: money.warning,
+                  fontWeight: FontWeight.w700,
+                ),
+              )
+            else if (remainingText != null)
               Text(
                 remainingText,
                 style: theme.textTheme.labelSmall?.copyWith(
