@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'finance_snapshot.dart';
 import 'models.dart';
 
@@ -93,4 +95,52 @@ abstract interface class FinanceRepository {
   ///
   /// Exposed so the UI can state the truth rather than assume it.
   Future<bool> verifyEncrypted();
+
+  /// Encrypts a complete snapshot of everything the user has recorded.
+  ///
+  /// The bytes are a self-contained file: they carry the data *and* its own
+  /// encryption, keyed by [passphrase] rather than by anything on this device.
+  /// That is what makes a backup usable after a reinstall or on another phone —
+  /// the database key itself lives in the platform keystore and dies with the
+  /// app, so it can never be what a backup relies on.
+  Future<Uint8List> exportBackup({required String passphrase});
+
+  /// Replaces everything stored with the contents of [bytes].
+  ///
+  /// Throws `BackupFailure` with a sentence the UI can show directly — a wrong
+  /// passphrase, a foreign file, a backup from a newer release. Nothing is
+  /// written in any of those cases: the replace happens in one transaction.
+  Future<BackupRestoreReport> restoreBackup({
+    required Uint8List bytes,
+    required String passphrase,
+  });
+
+  /// Whether the app asks for a fingerprint or the device PIN before showing
+  /// anything.
+  ///
+  /// Read at startup, before the first frame, so a locked app never renders the
+  /// ledger for an instant while the setting is fetched.
+  Future<bool> appLockEnabled();
+
+  /// Turns the screen-level lock on or off.
+  ///
+  /// Persisted in the encrypted database beside every other setting, so the flag
+  /// cannot be flipped by editing a plain file on a rooted device.
+  Future<void> setAppLockEnabled(bool enabled);
+}
+
+/// What a restore put back, so the confirmation can state it in the user's own
+/// terms rather than saying "done".
+class BackupRestoreReport {
+  const BackupRestoreReport({
+    required this.transactions,
+    required this.categories,
+    required this.accounts,
+    required this.recurringRules,
+  });
+
+  final int transactions;
+  final int categories;
+  final int accounts;
+  final int recurringRules;
 }

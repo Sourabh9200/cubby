@@ -31,6 +31,20 @@ dependencies:
   # Collision-resistant primary keys for user-created rows.
   uuid: ^4.6.0
 
+  # AES-256-GCM plus PBKDF2 for the encrypted backup file. Pure Dart, so it
+  # needs no platform plugin and behaves identically under `flutter test`.
+  cryptography: ^2.9.0
+
+  # The system file picker and save-as dialog, so a backup can leave the app's
+  # private sandbox and be chosen again on the way back. One plugin covers both
+  # directions, which is why `share_plus` is not needed here.
+  file_picker: ^13.0.0
+
+  # Fingerprint / face / device-PIN unlock. The database is already encrypted at
+  # rest; this is the screen-level gate in front of it, which is the layer the
+  # app's own passphrase comment said belonged to `local_auth`.
+  local_auth: ^3.0.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

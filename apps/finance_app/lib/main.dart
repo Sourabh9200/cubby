@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'app.dart';
 import 'data/drift_finance_repository.dart';
+import 'data/security/app_lock.dart';
 
 /// Entry point.
 ///
@@ -15,7 +16,16 @@ Future<void> main() async {
 
   try {
     final open = await DatabaseOpener.open();
-    runApp(FinanceApp(repository: DriftFinanceRepository(db: open.database)));
+    final repository = DriftFinanceRepository(db: open.database);
+    runApp(
+      FinanceApp(
+        repository: repository,
+        appLock: LocalAuthAppLock(),
+        // Read before the first frame, so a locked app cannot render the ledger
+        // for an instant while the setting is still being fetched.
+        appLockEnabled: await repository.appLockEnabled(),
+      ),
+    );
   } on Object catch (error, stackTrace) {
     // Showing the error beats a crash-on-launch with no explanation: this is
     // the one path where a user could otherwise lose access to their own data

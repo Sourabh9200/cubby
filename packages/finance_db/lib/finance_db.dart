@@ -24,6 +24,9 @@
 ///    app can tell the user the truth rather than assume it.
 library;
 
+export 'src/backup/backup_document.dart'
+    show BackupDocument, BackupFormatException;
+export 'src/backup/backup_queries.dart' show BackupQueries;
 export 'src/database.dart'
     show
         AccountsCompanion,

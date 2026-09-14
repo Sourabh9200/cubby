@@ -71,4 +71,13 @@ abstract final class SettingKeys {
   static const String currency = 'currency';
   static const String monthStartDay = 'month_start_day';
   static const String seedVersion = 'seed_version';
+
+  /// Whether the app asks for a fingerprint or the device PIN before showing the
+  /// ledger.
+  ///
+  /// Kept here rather than in shared preferences for the same reason as every
+  /// other setting: it travels inside the encrypted database, so the flag that
+  /// turns the lock off cannot be flipped by editing a plain-text file on a
+  /// rooted device while the app is closed.
+  static const String appLockEnabled = 'app_lock_enabled';
 }

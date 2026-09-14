@@ -12,6 +12,8 @@ import '../../data/snapshot_views.dart';
 import '../budgets/budgets_screen.dart';
 import 'widgets/action_tile.dart';
 import 'widgets/ai_engine_card.dart';
+import 'widgets/app_lock_card.dart';
+import 'widgets/backup_card.dart';
 import 'widgets/privacy_card.dart';
 import 'widgets/roadmap_card.dart';
 
@@ -228,6 +230,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       children: <Widget>[
         PrivacyCard(encrypted: _encrypted),
         const SizedBox(height: 14),
+        const AppLockCard(),
+        const SizedBox(height: 14),
         SectionCard(
           title: 'Your data',
           trailing: Text(
@@ -267,6 +271,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
         ),
+        const SizedBox(height: 14),
+        const BackupCard(),
         const SizedBox(height: 14),
         SectionCard(
           title: 'Budgets',
@@ -401,9 +407,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'Importing a bank statement (CSV)',
             'Receipt photos and OCR',
             'Monthly PDF export',
-            'Encrypted backup and restore',
             'Budget alerts as notifications',
-            'Unlock with fingerprint or PIN',
             // The next tier of the analytics plan: these need new tables, so
             // they are named here rather than half-built (docs/analytics.md).
             'Savings goals',

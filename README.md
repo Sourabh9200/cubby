@@ -21,14 +21,20 @@ rather than by a convention:
 **Working end to end, verified on a device:**
 
 - **Dashboard** — a period selector (**week, month, quarter or year**, monthly by
-  default) driving every card on the screen: spent/income/net, spending pace,
-  category donut, budgets, invested, biggest hits. Trends follows the same month.
+  default) driving every card on the screen: spent/income/net, spending pace with
+  **a projection line** (where the period lands, with the working one tap away),
+  **composition** (spent / invested / left unallocated), category donut, budgets
+  that say when a category is **heading over its limit**, invested, biggest hits,
+  and **what recurring rules have already scheduled**. Trends follows the same
+  month.
 - **Ledger** — grouped by day with subtotals, searchable, filterable by
   kind, and every entry can be **edited** or **deleted**.
-- **Trends** — spend/received/invested per month, savings rate history,
-  investing breakdown, the highest and lowest month on record for each of the
-  three measures, income split by source, and month-over-month category
-  movement.
+- **Trends** — spend/received/invested per month, **composition by month**, **this
+  month against the same month last year**, savings rate history, investing
+  breakdown, the highest and lowest month on record for each of the three
+  measures, income split by source, month-over-month category movement, **top
+  payees** with a per-payee drill-down, **spending rhythm** by day of week, and
+  **net worth over time, at cost**.
 - **Categories & budgets** — a monthly limit or target per category, and
   **custom categories** of any of the three kinds.
 - **Investments** — a third kind of money movement, tracked apart from spending
@@ -36,25 +42,51 @@ rather than by a convention:
 - **Recurring** — record an entry with Repeat switched on and it is posted again
   on the same day every month, including for months the app was not opened. The
   chip is on the edit sheet too, for making an entry you already have recurring.
-  Rules are listed and stopped under Settings, and stopping one leaves the entries
-  it already recorded untouched.
-- **Settings** — encryption status read from the file header, sample-data
-  load/remove, and erase-everything.
+  Rules are listed and stopped under Settings, **annualised** there (₹18,000 a
+  month is ₹2.2L a year), and Settings **proposes** a rule when the same payee,
+  for about the same amount, appears three or more times about a month apart —
+  only ever as a proposal.
+- **Settings** — encryption status read from the file header, **an encrypted
+  backup and restore** to one passphrase-protected file, a **screen-level app
+  lock** (fingerprint or the phone's PIN), sample-data load/remove, and
+  erase-everything. Budget editors offer a limit derived from the user's own last
+  six months.
 - **Assistant** — a fully local engine that answers from your own data, with a
-  disclosure of exactly what a hosted model would have been sent.
+  disclosure of exactly what a hosted model would have been sent. Asks include
+  the deeper figures: **the projection, what repeats, the places money went, and
+  this month against last year**.
 
 **Not built yet** (listed in-app under Settings → "Not built yet"):
 
-- CSV import, PDF export, backup/restore, biometric lock
+- CSV import, PDF export
 - Transfers — the `transfer` direction and `transfer_group_id` column exist and
   are excluded from every total, but nothing creates such a row
 - Accounts management (three accounts are seeded; there is no UI to add or edit)
-- Weekly and yearly recurrence (only monthly rules are built), budget alerts,
-  multi-currency
+- Weekly and yearly recurrence (only monthly rules are built). **Deliberately so
+  for annual bills:** an insurance premium is recorded as a single expense in the
+  month it is paid, so that month's total is meant to look heavy — see the note in
+  [`docs/analytics.md`](docs/analytics.md) §8. Budget alerts, multi-currency,
+  likewise
 - The remote half of the assistant. Only the local engine and the redaction
   package exist, deliberately: the privacy boundary is worth building and
   testing before anything is allowed to cross it.
 - iOS, web, and desktop. Only `android/` is configured.
+
+A tiered plan for the analytics work — period composition, forecasting,
+subscriptions, net worth and goals — together with the caveats each figure carries
+so it cannot quietly mislead, is kept in [`docs/analytics.md`](docs/analytics.md).
+**Tiers 0 and 1 of that plan are built**, along with two of Tier 3's three screens:
+composition, composition over time, year over year, top payees, spending rhythm and
+committed spend; then the projection and safe-to-spend, budget pace, suggested
+limits, annualised subscriptions, recurring-rule proposals, net worth at cost, and
+the assistant intents for them; and then a **reports** screen for any period from a
+day to a year — the change against the one before it, where the money went, who was
+paid, budget outcomes — with a **year in review** written as sentences. The deeper
+figures are behind a tap or a question — one line on the pace card, a link on the
+investing card, an icon in the Trends app bar, a proposal in Settings — rather than
+more cards on the two busiest screens. Tier 2 (goals, tags, splits, budget history,
+valuations) and Tier 3's calendar still need schema work or a screen, and are not
+built.
 
 ## Layout
 
@@ -64,7 +96,7 @@ A pub workspace: three packages, one lockfile, one resolved dependency graph.
 |------|-----------|------------:|------:|
 | [`packages/finance_assistant`](packages/finance_assistant/README.md) | Privacy boundary for LLM calls. Pure Dart, **zero runtime dependencies**. | 1,947 | 88 |
 | [`packages/finance_db`](packages/finance_db/README.md) | Drift schema, migrations, aggregation queries, passphrase handling. | 2,026 | 72 |
-| [`apps/finance_app`](apps/finance_app/README.md) | Flutter UI: five screens plus the shell and shared widgets. | 9,029 | 70 |
+| [`apps/finance_app`](apps/finance_app/README.md) | Flutter UI: five tabs plus the screens they push (budgets, reports, a payee, net worth) and the shared widgets. | 14,349 | 189 |
 
 `finance_db` line count excludes generated `.g.dart`. Each package README covers
 the reasoning behind that package's design; this file is the map.
@@ -119,7 +151,7 @@ green no-op is easy to mistake for a passing suite.
 ```sh
 cd packages/finance_assistant && dart test      # 88 tests — pure Dart, no Flutter SDK needed
 cd packages/finance_db        && flutter test   # 72 tests
-cd apps/finance_app           && flutter test   # 70 tests
+cd apps/finance_app           && flutter test   # 189 tests
 ```
 
 The same three gates CI runs:

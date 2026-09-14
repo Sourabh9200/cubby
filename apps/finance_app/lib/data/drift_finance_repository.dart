@@ -1,6 +1,11 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:drift/drift.dart' show Table, TableInfo, TableUpdateQuery;
 import 'package:finance_db/finance_db.dart' as db_layer;
 
+import 'backup/backup_crypto.dart';
+import 'backup/backup_failure.dart';
 import 'finance_repository.dart';
 import 'finance_snapshot.dart';
 import 'models.dart';
@@ -204,4 +209,69 @@ class DriftFinanceRepository implements FinanceRepository {
     }
     return db_layer.isFileEncrypted(file);
   }
+
+  @override
+  Future<Uint8List> exportBackup({required String passphrase}) async {
+    final document = await db.exportBackup();
+    final clearText = utf8.encode(jsonEncode(document.toJson()));
+    try {
+      return await BackupCrypto.seal(
+        clearText: clearText,
+        passphrase: passphrase,
+      );
+    } on Object catch (error) {
+      throw BackupFailure('The backup could not be encrypted: $error');
+    }
+  }
+
+  @override
+  Future<BackupRestoreReport> restoreBackup({
+    required Uint8List bytes,
+    required String passphrase,
+  }) async {
+    // Decrypt and validate *before* touching the database. A wrong passphrase or
+    // a foreign file must fail while the user's ledger is still intact, not
+    // halfway through replacing it.
+    final db_layer.BackupDocument document;
+    try {
+      final clearText = await BackupCrypto.open(
+        envelope: bytes,
+        passphrase: passphrase,
+      );
+      document = db_layer.BackupDocument.fromJson(
+        jsonDecode(utf8.decode(clearText)) as Map<String, Object?>,
+      );
+    } on BackupCryptoException catch (error) {
+      throw BackupFailure(error.message);
+    } on db_layer.BackupFormatException catch (error) {
+      throw BackupFailure(error.message);
+    } on FormatException {
+      throw const BackupFailure('That file is not a readable Cubby backup.');
+    }
+
+    try {
+      await db.importBackup(document);
+    } on db_layer.BackupFormatException catch (error) {
+      // A row this build cannot interpret. The replace runs in one transaction,
+      // so it rolls back and the existing ledger is left alone.
+      throw BackupFailure(error.message);
+    }
+
+    return BackupRestoreReport(
+      transactions: document.transactionCount,
+      categories: document.categories.length,
+      accounts: document.accounts.length,
+      recurringRules: document.recurringRules.length,
+    );
+  }
+
+  @override
+  Future<bool> appLockEnabled() async =>
+      await db.readSetting(db_layer.SettingKeys.appLockEnabled) == 'true';
+
+  @override
+  Future<void> setAppLockEnabled(bool enabled) => db.writeSetting(
+    db_layer.SettingKeys.appLockEnabled,
+    enabled ? 'true' : 'false',
+  );
 }

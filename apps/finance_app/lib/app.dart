@@ -4,6 +4,9 @@ import 'core/theme/app_theme.dart';
 import 'data/finance_repository.dart';
 import 'data/finance_snapshot.dart';
 import 'data/repository_scope.dart';
+import 'data/security/app_lock.dart';
+import 'data/security/app_lock_scope.dart';
+import 'features/lock/app_lock_gate.dart';
 import 'features/shell/home_shell.dart';
 
 /// Application root.
@@ -12,7 +15,13 @@ import 'features/shell/home_shell.dart';
 /// what lets a widget test supply a fixed snapshot, and what let the demo
 /// repository be replaced by the encrypted database without touching a screen.
 class FinanceApp extends StatelessWidget {
-  const FinanceApp({required this.repository, this.initialSnapshot, super.key});
+  const FinanceApp({
+    required this.repository,
+    this.initialSnapshot,
+    this.appLock,
+    this.appLockEnabled = false,
+    super.key,
+  });
 
   final FinanceRepository repository;
 
@@ -20,17 +29,39 @@ class FinanceApp extends StatelessWidget {
   /// database round trip.
   final FinanceSnapshot? initialSnapshot;
 
+  /// The platform unlock, or null in a build that has none.
+  ///
+  /// Optional so a widget test never reaches for a plugin: absent, the gate is
+  /// given one that reports it cannot ask, and the app behaves exactly as it did
+  /// before this feature existed.
+  final AppLock? appLock;
+
+  /// Whether the lock was on when the app started, read from the database before
+  /// the first frame.
+  final bool appLockEnabled;
+
   @override
-  Widget build(BuildContext context) =>
-      _Root(repository: repository, initialSnapshot: initialSnapshot);
+  Widget build(BuildContext context) => _Root(
+    repository: repository,
+    initialSnapshot: initialSnapshot,
+    appLock: appLock,
+    appLockEnabled: appLockEnabled,
+  );
 }
 
 /// Holds the snapshot subscription and rebuilds the tree on every emission.
 class _Root extends StatefulWidget {
-  const _Root({required this.repository, this.initialSnapshot});
+  const _Root({
+    required this.repository,
+    required this.initialSnapshot,
+    required this.appLock,
+    required this.appLockEnabled,
+  });
 
   final FinanceRepository repository;
   final FinanceSnapshot? initialSnapshot;
+  final AppLock? appLock;
+  final bool appLockEnabled;
 
   @override
   State<_Root> createState() => _RootState();
@@ -40,6 +71,19 @@ class _RootState extends State<_Root> {
   /// Created once. Building the stream inside `build` would resubscribe to the
   /// database on every rebuild.
   late final Stream<FinanceSnapshot> _snapshots = widget.repository.watch();
+
+  /// Created once, and shared: it carries whether the lock is on for the whole
+  /// session, and Settings flips it through this same instance so the gate
+  /// reacts at once rather than at the next launch.
+  late final AppLockController _appLock = AppLockController(
+    lock: widget.appLock ?? const UnavailableAppLock(),
+  )..setEnabled(widget.appLockEnabled);
+
+  @override
+  void dispose() {
+    _appLock.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -55,13 +99,24 @@ class _RootState extends State<_Root> {
         return RepositoryScope(
           snapshot: snapshot ?? FinanceSnapshot.empty(DateTime.now()),
           repository: widget.repository,
-          child: MaterialApp(
-            title: 'Cubby',
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.light(),
-            darkTheme: AppTheme.dark(),
-            themeMode: ThemeMode.system,
-            home: snapshot == null ? const _LoadingScreen() : const HomeShell(),
+          child: AppLockScope(
+            controller: _appLock,
+            child: MaterialApp(
+              title: 'Cubby',
+              debugShowCheckedModeBanner: false,
+              theme: AppTheme.light(),
+              darkTheme: AppTheme.dark(),
+              themeMode: ThemeMode.system,
+              // The gate is installed through `builder` rather than around
+              // MaterialApp so it sits above the navigator — every pushed route
+              // and dialog is covered — while still having the app's Theme and
+              // MediaQuery to draw the lock screen with.
+              builder: (BuildContext context, Widget? child) =>
+                  AppLockGate(child: child ?? const SizedBox.shrink()),
+              home: snapshot == null
+                  ? const _LoadingScreen()
+                  : const HomeShell(),
+            ),
           ),
         );
       },
