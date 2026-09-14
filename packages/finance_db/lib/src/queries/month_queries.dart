@@ -51,30 +51,34 @@ extension MonthQueries on AppDatabase {
     );
   }
 
-  /// Expense totals per day of [monthIso] (`YYYY-MM`), for the pace chart.
+  /// Expense totals per day, for every month on record.
+  ///
+  /// All months in one read rather than one query per month, so the pace curve
+  /// can follow whichever month the user selects without a query per step — and
+  /// so every month's curve describes the same revision of the ledger.
   ///
   /// Deliberately excludes investments. The pace curve answers "am I burning
   /// through this month faster than usual", and money moved into a fund is not
   /// burning — counting it would make a diligent saver look like a big spender
   /// on the one day a month their SIP lands.
-  Stream<List<DailyTotalRow>> watchDailyTotals(String monthIso) {
+  Stream<List<DailyTotalRow>> watchDailyTotals() {
     return customSelect(
       '''
-      SELECT CAST(substr(t.occurred_on, 9, 2) AS INTEGER) AS day,
+      SELECT substr(t.occurred_on, 1, 7) AS monthKey,
+             CAST(substr(t.occurred_on, 9, 2) AS INTEGER) AS day,
              COALESCE(SUM(t.amount_minor), 0) AS totalMinor
         FROM transactions t
        WHERE t.deleted_at IS NULL
          AND t.direction = 'expense'
-         AND substr(t.occurred_on, 1, 7) = ?
-       GROUP BY day
-       ORDER BY day
+       GROUP BY monthKey, day
+       ORDER BY monthKey, day
       ''',
-      variables: <Variable<Object>>[Variable<String>(monthIso)],
       readsFrom: <ResultSetImplementation<Object, Object>>{transactions},
     ).watch().map(
       (rows) => rows
           .map(
             (row) => DailyTotalRow(
+              monthKey: row.read<String>('monthKey'),
               day: row.read<int>('day'),
               totalMinor: row.read<int>('totalMinor'),
             ),

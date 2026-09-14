@@ -1,5 +1,6 @@
 import 'package:finance_app/app.dart';
 import 'package:finance_app/data/models.dart';
+import 'package:finance_app/data/snapshot_analytics.dart';
 import 'package:finance_app/data/snapshot_views.dart';
 import 'package:finance_app/features/transactions/widgets/transaction_sheet.dart';
 import 'package:finance_db/finance_db.dart' hide CategoryKind;
@@ -57,6 +58,55 @@ void main() {
         isNot(contains('Coffee')),
       );
       expect(snapshot.categoryNamed('Coffee')!.budgetMinor, 250000);
+    });
+
+    test('a custom category reaches every aggregate once an entry uses it', () async {
+      // Reported from a device: creating a category and recording against it
+      // appeared to change nothing on the overview, the ledger, or trends. The
+      // aggregation turned out to be correct, so this pins it — if a custom
+      // category ever stops reaching the donut, the month summary, the budget
+      // bars, or the trend movement, this fails rather than a user noticing.
+      final fixture = makeFixture();
+      addTearDown(fixture.dispose);
+
+      await fixture.repository.addCategory(
+        name: 'Subscriptions',
+        kind: CategoryKind.expense,
+        budgetMinor: 50000,
+      );
+      final created = (await fixture.snapshot()).categoryNamed(
+        'Subscriptions',
+      )!;
+      await fixture.repository.addTransaction(
+        accountId: SeedIds.accountHdfc,
+        categoryId: created.id,
+        amountMinor: 30000,
+        date: DateTime(2026, 9, 10),
+        direction: TxDirection.expense,
+        payee: 'Netflix',
+      );
+
+      final snapshot = await fixture.snapshot();
+      // The ledger resolves the name through the category join.
+      expect(
+        snapshot.transactions.map((txn) => txn.category),
+        contains('Subscriptions'),
+      );
+      // The overview's donut and its budget bars.
+      expect(
+        snapshot.spendByCategory(testNow).map((spend) => spend.category),
+        contains('Subscriptions'),
+      );
+      expect(
+        snapshot.budgetStatuses().map((status) => status.category),
+        contains('Subscriptions'),
+      );
+      // Trends: the month total and the month-over-month movement.
+      expect(snapshot.currentMonth.expenseMinor, 30000);
+      expect(
+        snapshot.categoryMovement(testNow).map((move) => move.category),
+        contains('Subscriptions'),
+      );
     });
 
     test('a custom income category is available for income entries', () async {
@@ -257,6 +307,42 @@ void main() {
       // The kind is what lets the row render "Target met" instead of a red
       // "Over by", which would punish the user for succeeding.
       expect(target.isInvestmentTarget, isTrue);
+    });
+
+    test('the seeded umbrella reports the whole investing total', () async {
+      // The bug this guards, reported from a device: ₹60,000 into mutual funds
+      // left "Mutual Funds ₹60,000" beside "Investments ₹0", so the two read as
+      // unrelated figures rather than a total and one of its parts.
+      final fixture = makeFixture();
+      addTearDown(fixture.dispose);
+
+      await fixture.repository.addTransaction(
+        accountId: SeedIds.accountHdfc,
+        categoryId: SeedIds.categoryMutualFunds,
+        amountMinor: 6000000,
+        date: DateTime(2026, 9, 5),
+        direction: TxDirection.investment,
+        payee: 'Index fund SIP',
+      );
+
+      final snapshot = await fixture.snapshot();
+      final umbrella = snapshot.categoryNamed('Investments')!;
+      expect(snapshot.isInvestmentRollup(umbrella), isTrue);
+      expect(snapshot.investedForCategory(umbrella, testNow), 6000000);
+
+      // A fund is a bucket, not a roll-up: it reports only its own entries.
+      final funds = snapshot.categoryNamed('Mutual Funds')!;
+      expect(snapshot.isInvestmentRollup(funds), isFalse);
+      expect(snapshot.investedForCategory(funds, testNow), 6000000);
+
+      // The breakdown the trends card draws still holds only what money was
+      // actually filed against, so the umbrella reporting the total cannot have
+      // it counted twice.
+      expect(
+        snapshot.investedByCategory(testNow).map((row) => row.category),
+        <String>['Mutual Funds'],
+      );
+      expect(snapshot.investmentTotal(testNow), 6000000);
     });
   });
 

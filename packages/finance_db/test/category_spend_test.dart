@@ -113,5 +113,53 @@ void main() {
         expect(point.colorKey, isNotEmpty);
       },
     );
+
+    test(
+      'carries income per category, so income can be split by source',
+      () async {
+        // The bug this guards. The query used to filter to
+        // `('expense', 'investment')`, so a monthly income breakdown could only be
+        // built from a second query — and every caller that forgot one silently
+        // reported that income had no source at all.
+        await seedSeptember(db);
+        final income = (await db.watchCategoryTrend().first)
+            .where((point) => point.direction == EntryDirection.income)
+            .toList();
+
+        expect(income, hasLength(1));
+        expect(income.single.categoryName, 'Income');
+        expect(income.single.monthKey, '2026-09');
+        expect(income.single.totalMinor, 900000);
+      },
+    );
+
+    test('marks each point with its own direction, never a neighbouring one', () async {
+      // Spend and income for the same month must not be able to swap places: a
+      // mislabelled direction would draw income in the spending series and make
+      // a month of saving look like a month of overspending.
+      await seedSeptember(db);
+      final points = await db.watchCategoryTrend().first;
+
+      expect(
+        points.where((point) => point.categoryName == 'Income'),
+        everyElement(
+          isA<CategoryTrendPoint>().having(
+            (point) => point.direction,
+            'direction',
+            EntryDirection.income,
+          ),
+        ),
+      );
+      expect(
+        points.where((point) => point.categoryName == 'Groceries'),
+        everyElement(
+          isA<CategoryTrendPoint>().having(
+            (point) => point.direction,
+            'direction',
+            EntryDirection.expense,
+          ),
+        ),
+      );
+    });
   });
 }

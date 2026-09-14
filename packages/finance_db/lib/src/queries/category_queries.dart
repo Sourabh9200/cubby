@@ -85,10 +85,16 @@ extension CategoryQueries on AppDatabase {
   /// Grouping on `substr(occurredOn, 1, 7)` keeps months in local time, which a
   /// `strftime` over UTC epoch seconds would not.
   ///
-  /// Returns spending *and* investing points in one pass, distinguished by
-  /// `direction`. One query rather than two so the two series cannot disagree:
-  /// if investing and spending were read separately, a write landing between the
-  /// two reads would leave the chart internally inconsistent.
+  /// Returns spending, income, *and* investing points in one pass, distinguished
+  /// by `direction`. One query rather than three so the series cannot disagree:
+  /// if spending and income were read separately, a write landing between the
+  /// two reads would leave one chart describing a revision of the ledger the
+  /// other had not seen yet.
+  ///
+  /// Income is included because "which sources did this month's money come
+  /// from" is a per-category question like spend is. It is the *direction* on
+  /// each point that keeps the three apart, which is why this query is safe to
+  /// use for all of them and why no caller has to join categories again.
   Stream<List<CategoryTrendPoint>> watchCategoryTrend() {
     return customSelect(
       '''
@@ -101,7 +107,7 @@ extension CategoryQueries on AppDatabase {
         FROM transactions t
         JOIN categories c ON c.id = t.category_id
        WHERE t.deleted_at IS NULL
-         AND t.direction IN ('expense', 'investment')
+         AND t.direction IN ('expense', 'income', 'investment')
        GROUP BY monthKey, c.id, t.direction
        ORDER BY monthKey, totalMinor DESC
       ''',

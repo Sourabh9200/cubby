@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../data/month_scope.dart';
+import '../../data/repository_scope.dart';
 import '../assistant/assistant_screen.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../settings/settings_screen.dart';
@@ -13,6 +15,10 @@ import '../trends/trends_screen.dart';
 /// positions and the ledger's search term survive navigation. Losing a filter
 /// because you glanced at another tab is the kind of small friction that makes
 /// an app feel cheap.
+///
+/// It also holds the month the aggregate screens are showing, for the same
+/// reason: a month that reset on every tab change would be worse than no month
+/// selector at all.
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
 
@@ -22,6 +28,10 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+
+  /// The month being shown, or null while the user has not moved off the month
+  /// in progress.
+  DateTime? _month;
 
   static const List<Widget> _screens = <Widget>[
     DashboardScreen(),
@@ -64,10 +74,46 @@ class _HomeShellState extends State<HomeShell> {
     showTransactionSheet(context);
   }
 
+  /// The month to show, clamped to the range that actually has data.
+  ///
+  /// Clamped during build rather than in `setState` so that erasing the last
+  /// entry of a month cannot leave the screens pointed at a month that has since
+  /// emptied — the data range shrinks under the selection, and every figure
+  /// would read ₹0 with nothing on screen to explain why.
+  DateTime _resolveMonth({
+    required DateTime? earliest,
+    required DateTime latest,
+  }) {
+    final selected = _month ?? latest;
+    if (selected.isAfter(latest)) {
+      return latest;
+    }
+    if (earliest != null && selected.isBefore(earliest)) {
+      return earliest;
+    }
+    return selected;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final snapshot = RepositoryScope.of(context);
+    final now = snapshot.now;
+    // The range the selector may move within: the month in progress is the
+    // newest thing that can have data, and the oldest is whichever month has
+    // some. `monthlySummaries` is ordered oldest first.
+    final latest = DateTime(now.year, now.month);
+    final earliest = snapshot.monthlySummaries.isEmpty
+        ? null
+        : snapshot.monthlySummaries.first.month;
+
     return Scaffold(
-      body: IndexedStack(index: _index, children: _screens),
+      body: MonthScope(
+        month: _resolveMonth(earliest: earliest, latest: latest),
+        earliest: earliest,
+        latest: latest,
+        onChanged: (value) => setState(() => _month = value),
+        child: IndexedStack(index: _index, children: _screens),
+      ),
       floatingActionButton: _index <= 1
           ? FloatingActionButton(
               onPressed: _quickAdd,

@@ -37,11 +37,6 @@ class BudgetsScreen extends StatelessWidget {
       for (final entry in snapshot.spendByCategory(snapshot.now))
         entry.category: entry.totalMinor,
     };
-    final invested = <String, int>{
-      for (final entry in snapshot.investedByCategory(snapshot.now))
-        entry.category: entry.totalMinor,
-    };
-
     final budgeted = spending.fold(0, (sum, c) => sum + c.budgetMinor);
     final spentAgainstBudgets = spending
         .where((category) => category.budgetMinor > 0)
@@ -127,15 +122,34 @@ class BudgetsScreen extends StatelessWidget {
               ),
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
                 for (final category in investing)
                   BudgetCategoryTile(
                     category: category,
-                    spentMinor: invested[category.name] ?? 0,
+                    // The seeded "Investments" is a roll-up, so its row reports
+                    // the month's whole investing total rather than its own
+                    // entries — a ₹0 beside a funded mutual fund is what made
+                    // the two look like separate things.
+                    spentMinor: snapshot.investedForCategory(
+                      category,
+                      snapshot.now,
+                    ),
                     onTap: () => editBudget(
                       context,
                       category: category,
-                      spentMinor: invested[category.name] ?? 0,
+                      spentMinor: snapshot.investedForCategory(
+                        category,
+                        snapshot.now,
+                      ),
+                    ),
+                  ),
+                if (investing.any(snapshot.isInvestmentRollup))
+                  Text(
+                    'Investments is the total of the categories below it, '
+                    'not a separate place to file money.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
               ],

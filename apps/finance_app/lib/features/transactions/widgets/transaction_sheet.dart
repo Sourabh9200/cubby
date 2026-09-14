@@ -56,6 +56,13 @@ class _TransactionSheetState extends State<TransactionSheet> {
 
   bool _saving = false;
 
+  /// Whether this entry should be posted again every month.
+  ///
+  /// Off by default: most entries are one-offs, and a repeat switch that
+  /// remembered its last position would quietly turn a coffee into a
+  /// subscription.
+  bool _repeatMonthly = false;
+
   /// The date to record against: today for a new entry, its own date when
   /// editing.
   ///
@@ -142,6 +149,20 @@ class _TransactionSheetState extends State<TransactionSheet> {
           direction: direction,
           payee: payee,
         );
+        if (_repeatMonthly) {
+          // Written after the entry, and starting from the entry's own date, so
+          // the rule's first occurrence is next month. The rule posts the months
+          // this entry cannot cover — a back-dated first entry means the months
+          // since are already due.
+          await repository.addRecurringRule(
+            accountId: accountId,
+            categoryId: category.id,
+            amountMinor: amount,
+            direction: direction,
+            startedOn: _date,
+            payee: payee,
+          );
+        }
       } else {
         await repository.updateTransaction(
           id: editing.id,
@@ -152,14 +173,38 @@ class _TransactionSheetState extends State<TransactionSheet> {
           direction: direction,
           payee: payee,
         );
+        if (_repeatMonthly) {
+          // Anchored on today rather than on the entry's own month, because this
+          // entry is being *made* recurring rather than recorded for the first
+          // time: the months before today may already have been entered by hand,
+          // and of the two possible mistakes only a duplicate is visible on
+          // screen.
+          await repository.addRecurringRule(
+            accountId: accountId,
+            categoryId: category.id,
+            amountMinor: amount,
+            direction: direction,
+            startedOn: _date,
+            payee: payee,
+            postMissedMonths: false,
+          );
+        }
       }
       navigator.pop();
       messenger.showSnackBar(
         SnackBar(
           content: Text(
             editing == null
-                ? 'Recorded ${Money.format(amount)} under ${category.name}'
-                : 'Updated ${Money.format(amount)} under ${category.name}',
+                ? (_repeatMonthly
+                      ? 'Recorded ${Money.format(amount)} under '
+                            '${category.name} · repeats monthly'
+                      : 'Recorded ${Money.format(amount)} under '
+                            '${category.name}')
+                : (_repeatMonthly
+                      ? 'Updated ${Money.format(amount)} under '
+                            '${category.name} · repeats from next month'
+                      : 'Updated ${Money.format(amount)} under '
+                            '${category.name}'),
           ),
         ),
       );
@@ -232,9 +277,13 @@ class _TransactionSheetState extends State<TransactionSheet> {
     if (!canSave) {
       return 'Pick a category';
     }
+    final suffix = _repeatMonthly ? ' · monthly' : '';
     return widget.isEditing
-        ? 'Update ${Money.format(_amountMinor)}'
-        : 'Save ${Money.format(_amountMinor)}';
+        ? 'Update ${Money.format(_amountMinor)}$suffix'
+        // The label is where the repeat is confirmed before saving: the chip is
+        // an icon-length control in a crowded row, so the consequence of it is
+        // stated on the button that acts on it.
+        : 'Save ${Money.format(_amountMinor)}$suffix';
   }
 
   @override
@@ -296,6 +345,22 @@ class _TransactionSheetState extends State<TransactionSheet> {
                   label: Text(_dateLabel()),
                   onPressed: _pickDate,
                   tooltip: 'Change the date',
+                ),
+                const SizedBox(width: 6),
+                FilterChip(
+                  // No avatar, and the shortest honest label, so the row still
+                  // fits beside the date chip on a narrow phone. The sheet's
+                  // layout guard exists because a control added here once pushed
+                  // the keypad off the bottom of the screen.
+                  label: const Text('Repeat'),
+                  selected: _repeatMonthly,
+                  // The two cases repeat from different places, so the tooltip
+                  // says which: a new entry is continued from its own month, an
+                  // entry that already existed starts from next month.
+                  tooltip: widget.isEditing
+                      ? 'Post this again every month, starting next month'
+                      : 'Post this again every month',
+                  onSelected: (value) => setState(() => _repeatMonthly = value),
                 ),
               ],
             ),

@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/month_selector_bar.dart';
 import '../../core/widgets/section_card.dart';
+import '../../data/month_scope.dart';
 import '../../data/snapshot_analytics.dart';
 import '../../data/repository_scope.dart';
+import '../../data/snapshot_views.dart';
 import 'widgets/category_movement_card.dart';
+import 'widgets/income_sources_card.dart';
 import 'widgets/investing_card.dart';
 import 'widgets/monthly_bars_chart.dart';
+import 'widgets/monthly_records_card.dart';
 import 'widgets/savings_rate_card.dart';
 
 /// Trends and month-over-month movement.
@@ -19,13 +24,24 @@ class TrendsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final repository = RepositoryScope.of(context);
+    final snapshot = RepositoryScope.of(context);
+    final scope = MonthScope.of(context);
     final theme = Theme.of(context);
     final money = MoneyColors.of(context);
 
     return CustomScrollView(
       slivers: <Widget>[
-        const SliverAppBar(pinned: true, title: Text('Trends')),
+        SliverAppBar(
+          pinned: true,
+          title: const Text('Trends'),
+          // The month-scoped cards below follow the same selection as the
+          // overview. The history cards — the bars, the savings rate, the
+          // records — deliberately do not: they exist to span every month.
+          bottom: const PreferredSize(
+            preferredSize: Size.fromHeight(MonthSelectorBar.height),
+            child: MonthSelectorBar(),
+          ),
+        ),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
           sliver: SliverList.list(
@@ -45,7 +61,7 @@ class TrendsScreen extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 14),
-                    MonthlyBarsChart(summaries: repository.monthlySummaries),
+                    MonthlyBarsChart(summaries: snapshot.monthlySummaries),
                     const SizedBox(height: 10),
                     Text(
                       'The gap between the green and red bars is what you kept '
@@ -59,14 +75,20 @@ class TrendsScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 14),
-              SavingsRateCard(summaries: repository.monthlySummaries),
+              SavingsRateCard(summaries: snapshot.monthlySummaries),
               const SizedBox(height: 14),
-              InvestingCard(snapshot: repository),
+              InvestingCard(snapshot: snapshot, month: scope.month),
+              const SizedBox(height: 14),
+              MonthlyRecordsCard(extremes: snapshot.monthlyExtremes),
+              const SizedBox(height: 14),
+              IncomeSourcesCard(
+                sources: snapshot.incomeBySource(scope.month),
+                totalMinor: snapshot.incomeTotal(scope.month),
+                month: scope.month,
+              ),
               const SizedBox(height: 14),
               CategoryMovementCard(
-                movements: repository.categoryMovement(
-                  repository.currentMonth.month,
-                ),
+                movements: snapshot.categoryMovement(scope.month),
               ),
             ],
           ),

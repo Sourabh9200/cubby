@@ -17,7 +17,9 @@ class FinanceSnapshot {
     required this.monthlySummaries,
     required this.categorySpendByMonth,
     required this.categoryInvestmentByMonth,
+    required this.categoryIncomeByMonth,
     required this.dailySpendByMonth,
+    required this.recurringRules,
     required this.now,
   });
 
@@ -46,8 +48,23 @@ class FinanceSnapshot {
   /// consumer of the spending map would otherwise have to remember to filter.
   final Map<String, Map<String, int>> categoryInvestmentByMonth;
 
+  /// `YYYY-MM` to category name to income received.
+  ///
+  /// Keyed by category because an income category *is* a source: "Salary" and
+  /// "Freelance" are different cash flows, and one income total cannot say which
+  /// of them carried the month. Kept out of the spending map for the same reason
+  /// investing is — money arriving is not money consumed.
+  final Map<String, Map<String, int>> categoryIncomeByMonth;
+
   /// `YYYY-MM` to day-of-month to spend.
   final Map<String, Map<int, int>> dailySpendByMonth;
+
+  /// Every live recurring rule, soonest due first.
+  ///
+  /// Carried in the snapshot rather than fetched by the settings screen, so a
+  /// rule that has just posted or been stopped repaints on the same emission as
+  /// the entry it wrote.
+  final List<RecurringRule> recurringRules;
 
   /// Reference time. Injected rather than read from the clock, so tests and
   /// month boundaries are deterministic.
@@ -61,7 +78,9 @@ class FinanceSnapshot {
     monthlySummaries: const <MonthlySummary>[],
     categorySpendByMonth: const <String, Map<String, int>>{},
     categoryInvestmentByMonth: const <String, Map<String, int>>{},
+    categoryIncomeByMonth: const <String, Map<String, int>>{},
     dailySpendByMonth: const <String, Map<int, int>>{},
+    recurringRules: const <RecurringRule>[],
     now: now,
   );
 
@@ -89,17 +108,5 @@ class FinanceSnapshot {
       incomeMinor: 0,
       byCategory: const <String, int>{},
     );
-  }
-
-  /// The month before [currentMonth], or null when there is no history.
-  MonthlySummary? get previousMonth {
-    final current = currentMonth.month;
-    MonthlySummary? candidate;
-    for (final summary in monthlySummaries) {
-      if (summary.month.isBefore(current)) {
-        candidate = summary;
-      }
-    }
-    return candidate;
   }
 }

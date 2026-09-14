@@ -15,18 +15,21 @@ import '../../../data/snapshot_views.dart';
 /// 60% of its income and invest none of it, and these two cards side by side say
 /// exactly that.
 class InvestingCard extends StatelessWidget {
-  const InvestingCard({required this.snapshot, super.key});
+  const InvestingCard({required this.snapshot, required this.month, super.key});
 
   final FinanceSnapshot snapshot;
+
+  /// The month being shown, which follows the month selector.
+  final DateTime month;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final money = MoneyColors.of(context);
-    final month = snapshot.currentMonth;
-    final total = month.investmentMinor;
-    final rate = month.investmentRate;
-    final byCategory = snapshot.investedByCategory(month.month);
+    final summary = snapshot.summaryFor(month);
+    final total = summary.investmentMinor;
+    final rate = summary.investmentRate;
+    final byCategory = snapshot.investedByCategory(month);
 
     if (total == 0) {
       return const SectionCard(
@@ -42,7 +45,7 @@ class InvestingCard extends StatelessWidget {
       );
     }
 
-    final saved = month.netMinor;
+    final saved = summary.netMinor;
     final shareOfSaved = saved <= 0 ? null : (total / saved) * 100;
 
     return SectionCard(

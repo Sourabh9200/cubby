@@ -154,18 +154,20 @@ class CategorySpend {
       grandTotal == 0 ? 0 : totalMinor / grandTotal * 100;
 }
 
-/// One month's income, spend, and investing, for the trend charts.
+/// Totals for a stretch of time, whatever its length.
+///
+/// The overview shows a week, a month, a quarter or a year, and the arithmetic
+/// for "what came in, what went out, what was set aside" is the same for all of
+/// them. Keeping it in one type is what makes a weekly headline and a monthly
+/// headline impossible to compute two different ways.
 @immutable
-class MonthlySummary {
-  const MonthlySummary({
-    required this.month,
+class PeriodTotals {
+  const PeriodTotals({
     required this.expenseMinor,
     required this.incomeMinor,
-    required this.byCategory,
     this.investmentMinor = 0,
   });
 
-  final DateTime month;
   final int expenseMinor;
   final int incomeMinor;
 
@@ -173,14 +175,12 @@ class MonthlySummary {
   /// not consumption — it does not reduce what the user owns.
   final int investmentMinor;
 
-  final Map<String, int> byCategory;
-
   /// Income less consumption: what was kept. Money invested is included here,
   /// not subtracted, which is what keeps the savings rate a measure of saving
   /// rather than of how much was moved off the current account.
   int get netMinor => incomeMinor - expenseMinor;
 
-  /// The actual change in cash across all accounts this month.
+  /// The actual change in cash across all accounts over the period.
   int get cashLeftMinor => incomeMinor - expenseMinor - investmentMinor;
 
   /// Savings rate as a percentage of income, or null when there was no income.
@@ -190,6 +190,77 @@ class MonthlySummary {
   /// Share of income routed into investments, or null when there was no income.
   double? get investmentRate =>
       incomeMinor == 0 ? null : (investmentMinor / incomeMinor) * 100;
+}
+
+/// One month's income, spend, and investing, for the trend charts.
+///
+/// A [PeriodTotals] with the month it belongs to and the spending split attached,
+/// because the charts need one point per month and the overview needs one figure
+/// per selected period.
+@immutable
+class MonthlySummary extends PeriodTotals {
+  const MonthlySummary({
+    required this.month,
+    required this.byCategory,
+    required super.expenseMinor,
+    required super.incomeMinor,
+    super.investmentMinor,
+  });
+
+  final DateTime month;
+
+  final Map<String, int> byCategory;
+}
+
+/// A rule that posts an entry into the ledger every month.
+///
+/// A rule rather than pre-written future rows: entries dated in the future would
+/// distort the month they land in from the moment the rule was made, which is the
+/// opposite of what "this repeats" means. Occurrences reach the ledger when they
+/// fall due, so every aggregate keeps working on ordinary entries.
+@immutable
+class RecurringRule {
+  const RecurringRule({
+    required this.id,
+    required this.amountMinor,
+    required this.category,
+    required this.categoryId,
+    required this.account,
+    required this.accountId,
+    required this.direction,
+    required this.payee,
+    required this.dayOfMonth,
+    required this.nextDueOn,
+  });
+
+  final String id;
+
+  /// Always positive. [direction] carries the sign, as everywhere else.
+  final int amountMinor;
+
+  final String category;
+  final String categoryId;
+  final String account;
+  final String accountId;
+
+  /// Derived from the category's kind when the rule is created, then fixed
+  /// there: re-kindling a category later must not change what a rule posts.
+  final TxDirection direction;
+
+  final String payee;
+
+  /// Day of the month the rule falls on, 1-31. A month too short for it takes
+  /// its last day instead.
+  final int dayOfMonth;
+
+  /// The next occurrence still to post.
+  final DateTime nextDueOn;
+
+  bool get isExpense => direction == TxDirection.expense;
+
+  bool get isInvestment => direction == TxDirection.investment;
+
+  bool get isIncome => direction == TxDirection.income;
 }
 
 /// A budget with its progress, ready for a progress bar.
@@ -211,6 +282,10 @@ class BudgetStatus {
   /// The distinction changes what "over" means: overshooting a spending limit is
   /// a problem, while overshooting an investing target is the goal.
   final CategoryKind kind;
+
+  /// True when a limit or target has been set. The figure is optional, and zero
+  /// is how a blank one is stored.
+  bool get hasLimit => budgetMinor > 0;
 
   bool get isInvestmentTarget => kind == CategoryKind.investment;
 

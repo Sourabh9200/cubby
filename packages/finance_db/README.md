@@ -99,9 +99,48 @@ manual plumbing.
 Aggregation happens in SQL against an index. Pulling a whole ledger into Dart to
 total it is what makes a finance app feel slow after a couple of years of real use.
 
+## Recurring rules
+
+`recurring_rules` holds a **template**, not a set of pre-written future entries.
+Rows dated in the future would distort the month they land in from the moment the
+rule was created — the opposite of what "this repeats" means — and every aggregate
+would have to learn to exclude them. Instead `materialiseDueRecurring` writes an
+occurrence into `transactions` when it falls due, so the ledger stays the single
+source of truth and every existing query, chart and total keeps working on
+ordinary entries.
+
+Four decisions in that engine are load-bearing:
+
+- **Idempotent by construction, not by a flag.** Posting an occurrence advances
+  `next_due_on` in the same batch that inserts the rows, so a restart, a crash, or
+  an app opened twice cannot post the same month's rent twice. A "already ran"
+  marker would be a second thing to keep in step with the first.
+- **It runs on open**, before the first read, so no screen can render a month that
+  is missing rent which has already been paid. It catches up every month that fell
+  due, because a missing month in a household ledger is harder to notice than a
+  wrong total.
+- **Short months clamp.** A rule on the 31st posts on the 30th in April and the
+  28th in February. Skipping the month would silently lose a payment; rolling into
+  the 1st would file it under the wrong month.
+- **There is a cap** (`maxOccurrencesPerRule`) because one bad due date — a rule
+  made from a heavily back-dated entry, or a device switched off for years — could
+  otherwise write thousands of rows on launch. A capped rule stays due, so the
+  remainder posts on the next run rather than being lost.
+
+Stopping a rule is a soft delete of the rule only. Occurrences it already posted
+are ordinary ledger entries: "not again" is not "erase the rent you already paid".
+
 ## Migrations
 
-`schemaVersion` is **2** today: v1 → v2 added `transactions.is_sample`.
+`schemaVersion` is **3** today. v1 → v2 added `transactions.is_sample`; v2 → v3
+added `recurring_rules`.
+
+The v2 → v3 step is additive on purpose, and the test says so: it inserts a ledger
+row at v2, migrates, and asserts the row is untouched and the new table starts
+empty. An upgrade must never rewrite a ledger row — that is the only thing in the
+database that cannot be reconstructed — and it must not materialise anything
+either, because an install predating the feature has no rules and inventing
+entries would put money in a ledger that never moved.
 
 `drift_schemas/drift_schema_v*.json` and `test/generated_migrations/` are
 **committed on purpose**. They are what let `SchemaVerifier` construct a real
@@ -160,7 +199,7 @@ investment kind required a seed version bump and no schema change at all, and wh
 ## Testing
 
 ```sh
-flutter test        # 57 tests
+flutter test        # 72 tests
 ```
 
 - `ledger_test.dart`, `category_spend_test.dart`, `time_series_test.dart`,

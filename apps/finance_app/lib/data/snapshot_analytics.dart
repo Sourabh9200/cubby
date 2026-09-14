@@ -1,6 +1,10 @@
 import 'category_movement.dart';
 import 'finance_snapshot.dart';
+import 'models.dart';
+import 'monthly_extremes.dart';
+import 'period_views.dart';
 import 'snapshot_views.dart';
+import 'stats_period.dart';
 
 /// Comparisons against history.
 ///
@@ -14,18 +18,17 @@ extension SnapshotAnalytics on FinanceSnapshot {
   /// day-of-month before comparing. Comparing a part-month against a whole one
   /// would read as a large saving every single time, which is worse than
   /// showing nothing.
-  double? get expenseChangePercent {
-    final previous = previousMonth;
-    if (previous == null || previous.expenseMinor == 0) {
-      return null;
-    }
-    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
-    final scaled = previous.expenseMinor * (now.day / daysInMonth);
-    if (scaled == 0) {
-      return null;
-    }
-    return ((currentMonth.expenseMinor - scaled) / scaled) * 100;
-  }
+  double? get expenseChangePercent => expenseChangeFor(currentMonth.month);
+
+  /// Month-over-month change in total spend for [month].
+  ///
+  /// An adapter onto [PeriodViews.expenseChangeForRange], so a weekly comparison
+  /// and a monthly one are the same arithmetic. A month that is over is compared
+  /// whole against the month before it — scaling there would invent a figure that
+  /// never happened. Only the month in progress is scaled, because only it is
+  /// incomplete.
+  double? expenseChangeFor(DateTime month) =>
+      expenseChangeForRange(StatsRange.containing(StatsPeriod.month, month));
 
   /// Mean monthly spend per category across every month present.
   ///
@@ -76,6 +79,55 @@ extension SnapshotAnalytics on FinanceSnapshot {
   /// Savings rate as a percentage of income for the current month, or null when
   /// there was no income to save from.
   double? get currentSavingsRate => currentMonth.savingsRate;
+
+  /// Highest and lowest month on record for each of the three measures, plus
+  /// the average over the months that recorded each one.
+  ///
+  /// Months with nothing recorded for a measure are skipped rather than counted
+  /// as zero. A month in which nothing was invested is not "the month you
+  /// invested least" — it is a month with no investing in it at all — and
+  /// counting it would report every user's worst investing month as whichever
+  /// month they happened to skip a contribution. The same reasoning makes the
+  /// average a mean over recording months.
+  List<MetricExtremes> get monthlyExtremes => <MetricExtremes>[
+    _extremesFor(MetricMeasure.expense, (summary) => summary.expenseMinor),
+    _extremesFor(MetricMeasure.income, (summary) => summary.incomeMinor),
+    _extremesFor(
+      MetricMeasure.investment,
+      (summary) => summary.investmentMinor,
+    ),
+  ];
+
+  MetricExtremes _extremesFor(
+    MetricMeasure measure,
+    int Function(MonthlySummary) read,
+  ) {
+    MonthPeak? highest;
+    MonthPeak? lowest;
+    var total = 0;
+    var months = 0;
+    for (final summary in monthlySummaries) {
+      final value = read(summary);
+      if (value <= 0) {
+        continue;
+      }
+      total += value;
+      months++;
+      if (highest == null || value > highest.totalMinor) {
+        highest = MonthPeak(month: summary.month, totalMinor: value);
+      }
+      if (lowest == null || value < lowest.totalMinor) {
+        lowest = MonthPeak(month: summary.month, totalMinor: value);
+      }
+    }
+    return MetricExtremes(
+      measure: measure,
+      highest: highest,
+      lowest: lowest,
+      // Integer division, because money in this app never becomes a double.
+      averageMinor: months == 0 ? 0 : total ~/ months,
+    );
+  }
 
   /// Savings rates for every month on record, oldest first.
   List<double> get savingsRateHistory => monthlySummaries

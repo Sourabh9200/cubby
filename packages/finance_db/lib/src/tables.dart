@@ -166,6 +166,80 @@ class Transactions extends Table {
   Set<Column<Object>> get primaryKey => <Column<Object>>{id};
 }
 
+/// How often a recurring rule posts.
+///
+/// Only monthly so far. Rent, a systematic investment plan, a salary and a
+/// subscription are all monthly, and weekly or yearly recurrence needs its own
+/// anchor arithmetic — day-of-week, leap years — that would be guesswork to add
+/// before anyone has asked for it. Stored as text, so adding a second frequency
+/// is a data change rather than a migration of every existing rule.
+enum RecurrenceFrequency { monthly }
+
+/// A template that posts an entry into the ledger every [frequency].
+///
+/// A rule rather than a set of pre-written future rows. Rows dated in the future
+/// would distort every month total from the moment the rule was created — the
+/// exact opposite of what someone means by "this repeats" — and every aggregate
+/// would have to learn to exclude them. Instead an occurrence is written into
+/// `transactions` when it falls due, so the ledger stays the single source of
+/// truth and every existing query, chart and total keeps working unchanged.
+class RecurringRules extends Table {
+  /// UUID v4, like every other row the user creates.
+  TextColumn get id => text()();
+
+  TextColumn get accountId =>
+      text().references(Accounts, #id, onDelete: KeyAction.restrict)();
+
+  TextColumn get categoryId =>
+      text().references(Categories, #id, onDelete: KeyAction.restrict)();
+
+  /// Always positive. [direction] carries the sign, exactly as on the ledger, so
+  /// a rule cannot post an expense as income by losing a minus.
+  IntColumn get amountMinor => integer().withDefault(const Constant(0))();
+
+  TextColumn get currency => text().withLength(min: 3, max: 3)();
+
+  /// Derived from the category's kind when the rule is created, then stored: a
+  /// rule whose category is later re-kindled should keep posting what the user
+  /// set up.
+  TextColumn get direction => textEnum<EntryDirection>()();
+
+  TextColumn get payee => text().withDefault(const Constant(''))();
+
+  TextColumn get note => text().withDefault(const Constant(''))();
+
+  TextColumn get frequency => textEnum<RecurrenceFrequency>()();
+
+  /// Day of the month the entry falls on, 1-31.
+  ///
+  /// A day past the end of a short month clamps to that month's last day, so a
+  /// rule on the 31st posts on the 30th in April and the 28th in February rather
+  /// than being skipped for a month or sliding into the next one.
+  IntColumn get dayOfMonth => integer()();
+
+  /// The next occurrence still to post, as a local ISO date.
+  ///
+  /// This is the whole idempotency mechanism. Posting an occurrence advances it
+  /// in the same transaction that writes the row, so a restart, a crash, or an
+  /// app opened twice cannot post the same month's rent twice.
+  TextColumn get nextDueOn => text().withLength(min: 10, max: 10)();
+
+  /// When the rule started, for display. Its first posted occurrence is the
+  /// month after this — the entry it was created from is already in the ledger.
+  TextColumn get startedOn => text().withLength(min: 10, max: 10)();
+
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  /// Soft delete, which is how a rule is stopped. Occurrences already posted are
+  /// ordinary ledger entries and are deliberately left alone: stopping a rule
+  /// means "not again", not "erase the rent you already paid".
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => <Column<Object>>{id};
+}
+
 /// Key/value settings.
 ///
 /// A table rather than shared preferences so that settings are covered by the

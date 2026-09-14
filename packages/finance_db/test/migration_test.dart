@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'generated_migrations/schema.dart';
 import 'generated_migrations/schema_v1.dart' as v1;
+import 'generated_migrations/schema_v2.dart' as v2;
 
 /// Migration tests.
 ///
@@ -18,19 +19,97 @@ void main() {
 
   setUpAll(() => verifier = SchemaVerifier(GeneratedHelper()));
 
-  test('v1 to v2 leaves the schema valid', () async {
+  test('v1 to v3 leaves the schema valid', () async {
     final schema = await verifier.schemaAt(1);
     final db = AppDatabase(schema.newConnection());
-    await verifier.migrateAndValidate(db, 2);
+    await verifier.migrateAndValidate(db, 3);
     await db.close();
   });
 
-  test('a fresh install is created directly at v2', () async {
+  test('v2 to v3 adds the rules table and leaves the ledger alone', () async {
+    // The upgrade that added recurring rules has to be purely additive: the rows
+    // a user already has cannot be reconstructed, so a migration that rewrote or
+    // dropped any of them would be unrecoverable data loss. It also must not
+    // materialise anything — an install predating this feature has no rules, so
+    // there is nothing due, and inventing entries would put money in a ledger
+    // that never moved.
+    final schema = await verifier.schemaAt(2);
+    final stamp = DateTime(2026, 9, 5).millisecondsSinceEpoch ~/ 1000;
+
+    final oldDb = v2.DatabaseAtV2(schema.newConnection());
+    await oldDb
+        .into(oldDb.accounts)
+        .insert(
+          v2.AccountsCompanion.insert(
+            id: 'legacy-account',
+            name: 'HDFC Savings',
+            type: 'bank',
+            currency: 'INR',
+            createdAt: stamp,
+            updatedAt: stamp,
+          ),
+        );
+    await oldDb
+        .into(oldDb.categories)
+        .insert(
+          v2.CategoriesCompanion.insert(
+            id: 'legacy-rent',
+            name: 'Rent',
+            kind: 'expense',
+            iconKey: 'home',
+            colorKey: 'indigo',
+            createdAt: stamp,
+            updatedAt: stamp,
+          ),
+        );
+    await oldDb
+        .into(oldDb.transactions)
+        .insert(
+          v2.TransactionsCompanion.insert(
+            id: 'legacy-rent-entry',
+            accountId: 'legacy-account',
+            categoryId: 'legacy-rent',
+            currency: 'INR',
+            direction: 'expense',
+            occurredOn: '2026-09-01',
+            occurredAt: stamp,
+            amountMinor: const Value<int>(1800000),
+            payee: const Value<String>('Monthly rent transfer'),
+            // The generated v2 schema exposes drift's raw storage form, where a
+            // boolean column is still an int.
+            isSample: const Value<int>(0),
+            createdAt: stamp,
+            updatedAt: stamp,
+          ),
+        );
+    await oldDb.close();
+
+    final db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 3);
+
+    // The ledger is untouched, byte for byte as far as the user is concerned.
+    final rows = await db.watchLedger().first;
+    expect(rows, hasLength(1));
+    expect(rows.single.id, 'legacy-rent-entry');
+    expect(rows.single.amountMinor, 1800000);
+    expect(rows.single.occurredOn, '2026-09-01');
+
+    // The new table exists, is readable through the app's own query, and starts
+    // empty — nothing was invented by the upgrade.
+    expect(await db.watchRecurringRules().first, isEmpty);
+
+    await db.close();
+  });
+
+  test('a fresh install is created directly at v3', () async {
     final db = AppDatabase.forTesting();
-    expect(db.schemaVersion, 2);
+    expect(db.schemaVersion, 3);
     // Seeding still works at the current version: 10 expense categories, 4
     // investment categories, and Income.
     expect(await db.watchCategories().first, hasLength(15));
+    // And a new install starts with no recurring rules, only the ability to
+    // create them.
+    expect(await db.watchRecurringRules().first, isEmpty);
     await db.close();
   });
 
@@ -190,7 +269,7 @@ void main() {
 
     // Run the migration on the real database class from the app.
     final db = AppDatabase(schema.newConnection());
-    await verifier.migrateAndValidate(db, 2);
+    await verifier.migrateAndValidate(db, 3);
 
     final rows = await db.watchLedger().first;
     expect(rows, hasLength(2), reason: 'both entries must survive');

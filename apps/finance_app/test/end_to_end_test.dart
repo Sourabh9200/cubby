@@ -82,7 +82,10 @@ void main() {
 
     expect(snapshot.currentMonth.expenseMinor, 12345);
     expect(snapshot.spendByCategory(testNow).single.totalMinor, 12345);
-    expect(snapshot.cumulativeDailySpend().last, closeTo(123.45, 0.01));
+    expect(
+      snapshot.cumulativeDailySpend(snapshot.currentMonth.month).last,
+      closeTo(123.45, 0.01),
+    );
   });
 
   test('deleting an entry removes it from every aggregate', () async {
@@ -161,7 +164,7 @@ void main() {
     expect(snapshot.budgetStatuses(), isNotEmpty);
 
     // The pace curve must end at the month total.
-    final pace = snapshot.cumulativeDailySpend();
+    final pace = snapshot.cumulativeDailySpend(snapshot.currentMonth.month);
     expect(pace.last, closeTo(snapshot.currentMonth.expenseMinor / 100, 0.01));
 
     // The savings rate must reflect the seeded salary against the expense.

@@ -53,6 +53,27 @@ abstract interface class FinanceRepository {
   /// Soft-deletes a user category. System categories are refused.
   Future<void> deleteCategory(String categoryId);
 
+  /// Creates a monthly rule that posts an entry like the one just recorded.
+  ///
+  /// The first occurrence is the month after [startedOn], because that entry is
+  /// already in the ledger.
+  ///
+  /// [postMissedMonths] is false when the entry being made recurring already
+  /// existed: the rule then starts from today rather than from the entry's month,
+  /// so months the user may have recorded by hand are never posted a second time.
+  Future<void> addRecurringRule({
+    required String accountId,
+    required String categoryId,
+    required int amountMinor,
+    required TxDirection direction,
+    required DateTime startedOn,
+    String payee,
+    bool postMissedMonths,
+  });
+
+  /// Stops a rule. Entries it already posted are left alone.
+  Future<void> stopRecurringRule(String ruleId);
+
   /// Populates six months of plausible history, for trying the app out.
   ///
   /// Returns the number of entries created.

@@ -59,10 +59,11 @@ Three decisions in that chain are load-bearing:
 - **The snapshot stream is created once**, on a `late final` field. Building it
   inside `build` would resubscribe to the database on every rebuild.
 
-Screens never aggregate. They call the derived views in `data/snapshot_views.dart`
-(`spendByCategory`, `budgetStatuses`, `investmentTargets`, `investedByCategory`,
-`cumulativeDailySpend`, …) and the comparisons in `data/snapshot_analytics.dart`
-(`expenseChangePercent`, `categoryMovement`, `savingsRateHistory`). Both files are
+Screens never aggregate. They call the derived views in `data/period_views.dart`
+(`totalsFor`, `spendIn`, `incomeIn`, `investedIn`, `topExpensesIn`,
+`budgetStatusesIn`, `cumulativeSpendIn`, `expenseChangeForRange`) and the
+comparisons in `data/snapshot_analytics.dart` (`categoryMovement`,
+`monthlyExtremes`, `savingsRateHistory`). Both files are
 pure functions of a snapshot, which is what makes the arithmetic testable without
 a widget or a database.
 
@@ -101,16 +102,16 @@ lib/
 
 | Screen | What it shows |
 |---|---|
-| **Overview** | Month totals, spending pace, category donut, invested card, budget bars, biggest hits |
+| **Overview** | Period selector (week / month / quarter / year), totals for that period, spending pace, category donut, invested card, budget bars scaled to the period (and categories with spend but no limit), biggest hits |
 | **Ledger** | Entries grouped by day with subtotals; search, kind filters, edit and delete |
-| **Trends** | Spend/received/invested bars, savings rate, investing breakdown, category movement |
+| **Trends** | Spend/received/invested bars, savings rate, investing breakdown, highest and lowest month per measure, income by source, category movement |
 | **Ask** | Local assistant engine plus a disclosure of what a hosted model would receive |
-| **Settings** | Encryption status, sample-data controls, categories & budgets, roadmap |
+| **Settings** | Encryption status, sample-data controls, categories & budgets, recurring rules, roadmap |
 
 ## Testing
 
 ```sh
-flutter test        # 32 tests
+flutter test        # 70 tests
 ```
 
 - `app_smoke_test.dart` — screens render, tabs exist, nothing crashes on a fresh
@@ -120,6 +121,22 @@ flutter test        # 32 tests
 - `categories_and_editing_test.dart` — custom categories, editing, and the
   investing invariants
 - `budgets_and_dates_test.dart` — budget editing and back-dated entries
+- `period_view_test.dart` — the week/month/quarter/year selector: period
+  boundaries (a week starts on Monday and can span a year), a quarter equalling
+  the sum of its months, budget limits scaling by whole months, and the weekly
+  view reporting no budgets at all
+- `backdated_category_test.dart` — the month selector: a category spent from in a
+  past month appears in that month's biggest hits, budget rows and movement, and
+  a category with no limit is shown rather than hidden
+- `category_visibility_test.dart` — how a category stays reachable from the
+  overview: the budget card's ordering, and a donut legend that lists every
+  category even when the ring merges the tail
+- `income_and_records_test.dart` — income split by source, and the highest and
+  lowest month per measure
+- `recurring_rules_test.dart` — a rule schedules the month after the entry it came
+  from and carries that entry's direction; making an *existing* entry recurring
+  starts next month instead of posting the months since; stopping one keeps what it
+  recorded
 - `sample_isolation_test.dart` — "remove sample data" cannot touch your own rows
 - `support/fixture.dart` — a real drift stack, in memory, with a fixed clock
 
@@ -144,6 +161,36 @@ now runs at a realistic phone size and fails if that regresses.
 - **Money is an integer in minor units, always** — never a `double`. Amounts are
   stored positive and `TxDirection` carries the sign, so a bug cannot silently
   flip a spend into income.
+- **A monthly limit scales by whole months, and a week gets no bars.** The
+  overview can show a week, a month, a quarter or a year, and every card follows
+  one `StatsRange`. Budgets are monthly, so a quarter's limit is three months of
+  it and a year's is twelve — `StatsPeriod.monthsCovered` — while a week holds no
+  whole month and therefore shows none rather than a limit stretched over seven
+  days. The same rule governs investing targets.
+- **The month-shaped views are adapters, not implementations.** `spendByCategory`,
+  `budgetStatuses` and friends delegate to the period views, so the weekly and
+  monthly figures are the same arithmetic over different bounds and cannot
+  disagree. The trend charts, the category averages and the assistant still ask
+  monthly questions because the *rules* they describe are monthly: a budget
+  repeats every month and a "best month on record" is a month.
+- **A recurring rule is a template, never a row dated in the future.** Occurrences
+  are written into the ledger on the day they fall due, so every aggregate sees
+  ordinary entries and no chart has to know that a rule exists. The rule's first
+  occurrence is the month *after* the entry it was created from, because that entry
+  is already in the ledger.
+- **The two ways of starting a rule are anchored differently, on purpose.** A new
+  entry continues from its own month and *posts the months since* — recording
+  August's rent in December should land September through December. Making an entry
+  that already existed recurring anchors on today instead, because the months
+  before it may already have been entered by hand, and of the two possible
+  mistakes only a duplicate is visible on screen.
+- **The seeded `Investments` category is a roll-up, not a bucket.** Its row
+  reports the month's whole investing total (`investedForCategory`), so money
+  funded into a mutual fund appears in it rather than beside it as a ₹0 — the two
+  figures used to read as unrelated numbers. Nothing sums those rows into a
+  headline, so reporting the total there cannot double-count it, and the trends
+  breakdown — where each row is a *share* of the total — still holds only what
+  money was actually filed against.
 - **A category decides the direction of its entries**, so the user never states
   something the app already knows — and an investing category can never be filed
   as spend.

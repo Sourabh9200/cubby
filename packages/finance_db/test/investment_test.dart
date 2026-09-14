@@ -180,7 +180,9 @@ void main() {
           ),
       );
 
-      final daily = await db.watchDailyTotals('2026-09').first;
+      final daily = (await db.watchDailyTotals().first)
+          .where((day) => day.monthKey == '2026-09')
+          .toList();
       // Only the groceries. Counting the SIP here would make a diligent saver
       // look like a big spender on the day their SIP lands.
       expect(daily.single.day, 5);

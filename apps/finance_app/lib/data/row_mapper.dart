@@ -46,6 +46,26 @@ abstract final class RowMapper {
     isSystem: row.isSystem,
   );
 
+  /// Converts a recurring rule, resolving its category and account names.
+  static RecurringRule toRecurringRule(db_layer.RecurringRuleRow row) =>
+      RecurringRule(
+        id: row.id,
+        amountMinor: row.amountMinor,
+        category: row.categoryName,
+        categoryId: row.categoryId,
+        account: row.accountName,
+        accountId: row.accountId,
+        direction: switch (row.direction) {
+          db_layer.EntryDirection.income => TxDirection.income,
+          db_layer.EntryDirection.transfer => TxDirection.transfer,
+          db_layer.EntryDirection.investment => TxDirection.investment,
+          db_layer.EntryDirection.expense => TxDirection.expense,
+        },
+        payee: row.payee,
+        dayOfMonth: row.dayOfMonth,
+        nextDueOn: row.nextDue,
+      );
+
   /// Converts an account row.
   static AccountBalance toAccountBalance(db_layer.AccountRow row) =>
       AccountBalance(
@@ -92,6 +112,15 @@ abstract final class RowMapper {
     List<db_layer.CategoryTrendPoint> points,
   ) => _groupTrendByDirection(points, db_layer.EntryDirection.investment);
 
+  /// Income grouped by `YYYY-MM` and category name — that is, by source.
+  ///
+  /// From the same single read as the spending and investing maps, so a card
+  /// splitting income by source cannot add up to a figure that disagrees with
+  /// the headline income total for the same month.
+  static Map<String, Map<String, int>> toCategoryIncomeByMonth(
+    List<db_layer.CategoryTrendPoint> points,
+  ) => _groupTrendByDirection(points, db_layer.EntryDirection.income);
+
   /// Builds one [MonthlySummary] per month, attaching the per-category split.
   static List<MonthlySummary> toMonthSummaries({
     required List<db_layer.MonthTotalRow> totals,
@@ -111,13 +140,21 @@ abstract final class RowMapper {
     return summaries;
   }
 
-  /// Shapes the current month's daily totals for the pace chart.
-  static Map<String, Map<int, int>> toDailySpendByMonth({
-    required String monthKey,
-    required List<db_layer.DailyTotalRow> rows,
-  }) => <String, Map<int, int>>{
-    monthKey: <int, int>{for (final row in rows) row.day: row.totalMinor},
-  };
+  /// Shapes the daily totals into `YYYY-MM` to day-of-month to spend.
+  ///
+  /// Every month, from one read: the pace chart follows whichever month the user
+  /// is looking at, and a map keyed by month is what lets it move between them
+  /// without another query.
+  static Map<String, Map<int, int>> toDailySpendByMonth(
+    List<db_layer.DailyTotalRow> rows,
+  ) {
+    final byMonth = <String, Map<int, int>>{};
+    for (final row in rows) {
+      byMonth.putIfAbsent(row.monthKey, () => <int, int>{})[row.day] =
+          row.totalMinor;
+    }
+    return byMonth;
+  }
 
   /// An empty snapshot, used before the first emission.
   static FinanceSnapshot emptySnapshot(DateTime now) =>

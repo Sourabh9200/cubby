@@ -58,24 +58,34 @@ void main() {
   group('daily totals', () {
     setUp(() => seedSeptember(db));
 
-    test('groups by day of month within the given month', () async {
-      final days = await db.watchDailyTotals('2026-09').first;
-      expect(days.map((d) => d.day), <int>[2, 11, 20]);
-      expect(days.first.totalMinor, 100000);
+    test('groups by day, one series per month on record', () async {
+      final days = await db.watchDailyTotals().first;
+      final september = days.where((day) => day.monthKey == '2026-09').toList();
+      expect(september.map((d) => d.day), <int>[2, 11, 20]);
+      expect(september.first.totalMinor, 100000);
+      // The fixture also has a 30 August entry, and it comes back in the same
+      // read rather than requiring a query per month.
+      expect(days.any((day) => day.monthKey == '2026-08'), isTrue);
     });
 
     test('excludes income', () async {
-      final days = await db.watchDailyTotals('2026-09').first;
+      final days = await db.watchDailyTotals().first;
       // The 1st carried only income, so it must not appear at all.
-      expect(days.any((d) => d.day == 1), isFalse);
+      expect(
+        days.any((day) => day.monthKey == '2026-09' && day.day == 1),
+        isFalse,
+      );
     });
 
     test('a soft-deleted entry disappears from the day series', () async {
       await (db.update(db.transactions)..where((t) => t.id.equals('g1'))).write(
         TransactionsCompanion(deletedAt: Value<DateTime>(DateTime.now())),
       );
-      final days = await db.watchDailyTotals('2026-09').first;
-      expect(days.any((d) => d.day == 2), isFalse);
+      final days = await db.watchDailyTotals().first;
+      expect(
+        days.any((day) => day.monthKey == '2026-09' && day.day == 2),
+        isFalse,
+      );
     });
   });
 

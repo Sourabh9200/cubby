@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../core/format/money.dart';
+import '../../core/widgets/indicators.dart';
 import '../../core/widgets/section_card.dart';
+import '../../data/models.dart';
 import '../../data/repository_scope.dart';
 import '../../data/snapshot_views.dart';
 import '../budgets/budgets_screen.dart';
@@ -81,8 +84,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: const Text('Erase every transaction?'),
         content: const Text(
           'This removes your own entries as well as any sample data. Your '
-          'categories, accounts, and budgets stay. It cannot be undone from '
-          'inside the app.',
+          'categories, accounts, budgets, and recurring rules stay — a rule '
+          'keeps recording future entries. It cannot be undone from inside the '
+          'app.',
         ),
         actions: <Widget>[
           TextButton(
@@ -110,6 +114,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _busy = false);
     messenger.showSnackBar(
       const SnackBar(content: Text('All transactions erased.')),
+    );
+  }
+
+  /// Stops a recurring rule, after asking.
+  ///
+  /// A confirmation because the consequence is invisible: the rule is the only
+  /// record that next month's rent was going to be recorded for you, and nothing
+  /// on the ledger hints at it. The dialog also says what is *not* lost, so
+  /// stopping a rule does not read as deleting the rent already paid.
+  Future<void> _stopRule(RecurringRule rule) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Stop repeating ${rule.category}?'),
+        content: const Text(
+          'Nothing new will be recorded for this rule. The entries it already '
+          'recorded stay in your ledger.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Stop repeating'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    setState(() => _busy = true);
+    final repository = RepositoryScope.actions(context);
+    final messenger = ScaffoldMessenger.of(context);
+    await repository.stopRecurringRule(rule.id);
+    if (!mounted) {
+      return;
+    }
+    setState(() => _busy = false);
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Stopped. Recorded entries were kept.')),
     );
   }
 
@@ -177,6 +225,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         const SizedBox(height: 14),
+        SectionCard(
+          title: 'Recurring',
+          trailing: Text(
+            snapshot.recurringRules.isEmpty
+                ? 'none yet'
+                : '${snapshot.recurringRules.length} active',
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          child: snapshot.recurringRules.isEmpty
+              ? const EmptyState(
+                  dense: true,
+                  icon: Icons.repeat_rounded,
+                  title: 'Nothing repeats yet',
+                  message:
+                      'Record an entry with Repeat switched on and it is '
+                      'posted again on the same day every month.',
+                )
+              : Column(
+                  children: <Widget>[
+                    for (final rule in snapshot.recurringRules)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: CategoryAvatar(
+                          category: rule.category,
+                          size: 38,
+                        ),
+                        title: Text(
+                          '${rule.category} · '
+                          '${Money.format(rule.amountMinor, decimals: false)}',
+                        ),
+                        subtitle: Text(
+                          'Every month on the ${_dayOrdinal(rule.dayOfMonth)}'
+                          ' · next ${DateLabels.dayMonth(rule.nextDueOn)}',
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.stop_circle_outlined),
+                          tooltip: 'Stop repeating',
+                          onPressed: _busy ? null : () => _stopRule(rule),
+                        ),
+                      ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'An entry is posted when its day arrives, including for '
+                      'months the app was not opened. Stopping a rule leaves '
+                      'the entries it already recorded alone.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+        const SizedBox(height: 14),
         AiEngineCard(
           cloudEnabled: _cloudEngine,
           onChanged: (value) => setState(() => _cloudEngine = value),
@@ -190,7 +293,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'Encrypted backup and restore',
             'Budget alerts as notifications',
             'Unlock with fingerprint or PIN',
-            'Editing an existing entry',
           ],
         ),
         const SizedBox(height: 20),
@@ -205,4 +307,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ],
     );
   }
+}
+
+/// "1st", "2nd", "3rd", "21st" — how a day of the month is actually said aloud,
+/// which is how a recurring rent is described.
+String _dayOrdinal(int day) {
+  if (day >= 11 && day <= 13) {
+    return '${day}th';
+  }
+  return switch (day % 10) {
+    1 => '${day}st',
+    2 => '${day}nd',
+    3 => '${day}rd',
+    _ => '${day}th',
+  };
 }

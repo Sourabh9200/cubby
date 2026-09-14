@@ -26,6 +26,13 @@ AccountType parseAccountType(String raw) => AccountType.values.firstWhere(
   orElse: () => AccountType.bank,
 );
 
+/// Parses a [RecurrenceFrequency] from its stored name.
+RecurrenceFrequency parseRecurrenceFrequency(String raw) =>
+    RecurrenceFrequency.values.firstWhere(
+      (value) => value.name == raw,
+      orElse: () => RecurrenceFrequency.monthly,
+    );
+
 /// Formats a [DateTime] as the local ISO date used by `occurredOn`.
 String isoDate(DateTime date) {
   final month = date.month.toString().padLeft(2, '0');

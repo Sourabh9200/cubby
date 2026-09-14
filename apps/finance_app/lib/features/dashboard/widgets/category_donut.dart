@@ -16,8 +16,14 @@ class CategoryDonut extends StatelessWidget {
 
   final List<CategorySpend> spends;
 
-  /// Categories beyond this count are merged into "Other" so the ring stays
-  /// readable. Beyond roughly seven slices the eye cannot compare arcs anyway.
+  /// Categories beyond this count are merged into a single "Other" slice so the
+  /// ring stays readable — beyond roughly seven arcs the eye cannot compare them
+  /// anyway.
+  ///
+  /// The *legend* is not capped: it lists every category, with the merged ones
+  /// drawn in the "Other" colour. A legend that omitted the tail is how a
+  /// category the user had just spent from disappeared from this screen, which
+  /// reads as a lost entry rather than as a chart simplification.
   final int maxSlices;
 
   @override
@@ -48,6 +54,9 @@ class CategoryDonut extends StatelessWidget {
 
     final total = merged.fold(0, (sum, item) => sum + item.totalMinor);
     final theme = Theme.of(context);
+    // The colour the ring gives the merged tail, so a legend row past the cap
+    // carries the colour of the arc it was drawn inside.
+    final otherColor = CategoryPalette.forLabel(context, 'Other');
 
     return Column(
       children: <Widget>[
@@ -99,8 +108,11 @@ class CategoryDonut extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 18),
-        ...merged.map(
-          (item) => Padding(
+        // Every category, not just the slices. The ordering matches the ring
+        // (largest first), so a row past the cap is one of the arcs drawn inside
+        // "Other" — and it carries the "Other" colour so the two still agree.
+        for (var index = 0; index < spends.length; index++)
+          Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: Row(
               children: <Widget>[
@@ -108,20 +120,25 @@ class CategoryDonut extends StatelessWidget {
                   width: 10,
                   height: 10,
                   decoration: BoxDecoration(
-                    color: CategoryPalette.forLabel(context, item.category),
+                    color: index < maxSlices
+                        ? CategoryPalette.forLabel(
+                            context,
+                            spends[index].category,
+                          )
+                        : otherColor,
                     borderRadius: BorderRadius.circular(3),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    item.category,
+                    spends[index].category,
                     style: theme.textTheme.bodyMedium,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 Text(
-                  '${item.shareOf(total).toStringAsFixed(0)}%',
+                  '${spends[index].shareOf(total).toStringAsFixed(0)}%',
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -130,7 +147,7 @@ class CategoryDonut extends StatelessWidget {
                 SizedBox(
                   width: 84,
                   child: Text(
-                    Money.format(item.totalMinor, decimals: false),
+                    Money.format(spends[index].totalMinor, decimals: false),
                     textAlign: TextAlign.right,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
@@ -140,7 +157,14 @@ class CategoryDonut extends StatelessWidget {
               ],
             ),
           ),
-        ),
+        if (hidden.isNotEmpty)
+          Text(
+            'The ring draws the ${hidden.length} smallest of these as one '
+            '"Other" slice. Every category is listed above.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
       ],
     );
   }

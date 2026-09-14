@@ -16,7 +16,13 @@ part 'database.g.dart';
 /// over a growing ledger, and drift checks those queries at compile time and
 /// generates a verified migration path between schema versions.
 @DriftDatabase(
-  tables: <Type>[Accounts, Categories, Transactions, SettingsEntries],
+  tables: <Type>[
+    Accounts,
+    Categories,
+    Transactions,
+    RecurringRules,
+    SettingsEntries,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   /// Wraps an existing executor. Tests pass
@@ -91,8 +97,14 @@ class AppDatabase extends _$AppDatabase {
   /// Existing rows default to false, which is correct: everything written before
   /// this column existed was either the user's or indistinguishable from it, and
   /// mislabelling it as sample would make "erase sample data" a data-loss button.
+  ///
+  /// Schema 2 -> 3 added the `recurring_rules` table. Purely additive, and
+  /// deliberately so: the upgrade must not touch a single ledger row, because the
+  /// rows a user already has are the only thing in this database that cannot be
+  /// reconstructed. Nothing is materialised by the migration either — an
+  /// existing install has no rules, so there is nothing due.
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -113,6 +125,9 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           "UPDATE transactions SET is_sample = 1 WHERE note = 'Sample data';",
         );
+      }
+      if (from < 3) {
+        await m.createTable(recurringRules);
       }
     },
     beforeOpen: (OpeningDetails details) async {

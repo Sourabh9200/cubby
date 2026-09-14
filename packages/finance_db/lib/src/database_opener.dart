@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'database.dart';
 import 'passphrase_store.dart';
 import 'queries/category_queries.dart';
+import 'recurring.dart';
 
 /// Opens the app's encrypted database.
 ///
@@ -36,6 +37,13 @@ class DatabaseOpener {
       passphrase: passphrase,
       requireCipherSupport: requireCipherSupport,
     );
+
+    // Post anything that fell due while the app was closed, before the first
+    // read. Doing it here rather than from a screen means every screen sees the
+    // same ledger, and a month cannot render without the rent that has already
+    // been paid. Idempotent: posting an occurrence advances the rule's due date
+    // in the same write.
+    await materialiseDueRecurring(database, today: DateTime.now());
 
     // Force a real read so the file is created before we inspect its header.
     await database.watchCategories().first;

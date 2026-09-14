@@ -29,6 +29,7 @@ export 'src/database.dart'
         AccountsCompanion,
         AppDatabase,
         CategoriesCompanion,
+        RecurringRulesCompanion,
         SettingsEntriesCompanion,
         TransactionsCompanion;
 export 'src/database_opener.dart' show DatabaseOpener, OpenResult;
@@ -42,8 +43,14 @@ export 'src/queries/account_queries.dart' show AccountQueries;
 export 'src/queries/category_queries.dart' show CategoryQueries;
 export 'src/queries/ledger_queries.dart' show LedgerQueries;
 export 'src/queries/month_queries.dart' show MonthQueries;
+export 'src/queries/recurring_queries.dart' show RecurringQueries;
 export 'src/queries/row_parsing.dart'
-    show isoDate, isoMonth, monthEndIso, monthStartIso;
+    show
+        isoDate,
+        isoMonth,
+        monthEndIso,
+        monthStartIso,
+        parseRecurrenceFrequency;
 export 'src/query_rows.dart'
     show
         AccountRow,
@@ -52,7 +59,14 @@ export 'src/query_rows.dart'
         CategoryTrendPoint,
         DailyTotalRow,
         LedgerRow,
-        MonthTotalRow;
+        MonthTotalRow,
+        RecurringRuleRow;
+export 'src/recurring.dart'
+    show
+        firstOccurrenceAfter,
+        materialiseDueRecurring,
+        monthlyOccurrence,
+        nextOccurrenceAfter;
 export 'src/seed_data.dart'
     show currentSeedVersion, seedDefaults, seedMissingDefaults;
 export 'src/seed_keys.dart'
@@ -64,5 +78,7 @@ export 'src/tables.dart'
         Categories,
         CategoryKind,
         EntryDirection,
+        RecurrenceFrequency,
+        RecurringRules,
         SettingsEntries,
         Transactions;

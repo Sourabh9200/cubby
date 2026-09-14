@@ -126,7 +126,18 @@ class MonthTotalRow {
 
 /// Spend for a single day, used by the cumulative-pace chart.
 class DailyTotalRow {
-  const DailyTotalRow({required this.day, required this.totalMinor});
+  const DailyTotalRow({
+    required this.monthKey,
+    required this.day,
+    required this.totalMinor,
+  });
+
+  /// `YYYY-MM` in local time.
+  ///
+  /// Carried so one read can serve every month: the pace chart follows whichever
+  /// month the user is looking at, and fetching each month separately would
+  /// issue a query per step of the month selector.
+  final String monthKey;
 
   final int day;
   final int totalMinor;
@@ -178,6 +189,49 @@ class CategoryRow {
   final int budgetMinor;
   final bool isSystem;
   final int sortOrder;
+}
+
+/// A recurring rule with its category and account resolved to display names.
+class RecurringRuleRow {
+  const RecurringRuleRow({
+    required this.id,
+    required this.accountId,
+    required this.accountName,
+    required this.categoryId,
+    required this.categoryName,
+    required this.amountMinor,
+    required this.direction,
+    required this.payee,
+    required this.note,
+    required this.frequency,
+    required this.dayOfMonth,
+    required this.nextDueOn,
+    required this.startedOn,
+  });
+
+  final String id;
+  final String accountId;
+  final String accountName;
+  final String categoryId;
+  final String categoryName;
+  final int amountMinor;
+  final EntryDirection direction;
+  final String payee;
+  final String note;
+  final RecurrenceFrequency frequency;
+  final int dayOfMonth;
+
+  /// Local ISO date of the next occurrence still to post.
+  final String nextDueOn;
+
+  /// Local ISO date the rule started from.
+  final String startedOn;
+
+  /// The next occurrence, as a local [DateTime] at midnight.
+  DateTime get nextDue => DateTime.parse(nextDueOn);
+
+  bool get isExpense => direction == EntryDirection.expense;
+  bool get isInvestment => direction == EntryDirection.investment;
 }
 
 /// An account with its computed balance.

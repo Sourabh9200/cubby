@@ -20,6 +20,7 @@ class BudgetRow extends StatelessWidget {
     final theme = Theme.of(context);
     final money = MoneyColors.of(context);
     final percent = (budget.fraction * 100).clamp(0, 999).toStringAsFixed(0);
+    final hasLimit = budget.hasLimit;
 
     // A target reads the opposite way round from a limit: overshooting an
     // investing goal is the achievement, while overshooting a spending limit is
@@ -32,11 +33,16 @@ class BudgetRow extends StatelessWidget {
       decimals: false,
     );
 
-    final statusText = isTarget
+    // A category with spend but no figure set is shown rather than hidden: the
+    // limit is optional in the category editor, and silently omitting the row
+    // makes "no limit set" indistinguishable from "not tracked at all".
+    final statusText = !hasLimit
+        ? 'No limit set'
+        : isTarget
         ? (isOver ? 'Target met · $overMinor over' : '$percent% funded')
         : (isOver ? 'Over by $overMinor' : '$percent% used');
 
-    final remainingText = isOver
+    final remainingText = !hasLimit || isOver
         ? null
         : isTarget
         ? '${Money.format(budget.remainingMinor, decimals: false)} to go'
@@ -60,8 +66,10 @@ class BudgetRow extends StatelessWidget {
               ),
             ),
             Text(
-              '${Money.compact(budget.spentMinor)} / '
-              '${Money.compact(budget.budgetMinor)}',
+              hasLimit
+                  ? '${Money.compact(budget.spentMinor)} / '
+                        '${Money.compact(budget.budgetMinor)}'
+                  : '${Money.compact(budget.spentMinor)} spent',
               style: theme.textTheme.labelMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -77,13 +85,17 @@ class BudgetRow extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 7),
-        BudgetBar(
-          fraction: budget.fraction,
-          // Exceeding a target is not an overrun, so it never takes the
-          // over-budget path — it is coloured as an achievement instead.
-          overBudget: isOver && !isTarget,
-          color: isTarget && isOver ? money.income : null,
-        ),
+        // No bar without a limit: a bar tracks progress toward a figure, and
+        // there is no figure here. Drawing an empty track would read as "0% of
+        // nothing" rather than "nothing set".
+        if (hasLimit)
+          BudgetBar(
+            fraction: budget.fraction,
+            // Exceeding a target is not an overrun, so it never takes the
+            // over-budget path — it is coloured as an achievement instead.
+            overBudget: isOver && !isTarget,
+            color: isTarget && isOver ? money.income : null,
+          ),
         const SizedBox(height: 5),
         Row(
           children: <Widget>[

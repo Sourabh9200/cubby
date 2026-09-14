@@ -20,16 +20,24 @@ rather than by a convention:
 
 **Working end to end, verified on a device:**
 
-- **Dashboard** — spent/income/invested for the month, spending pace, category
-  donut, budget bars, biggest individual expenses.
+- **Dashboard** — a period selector (**week, month, quarter or year**, monthly by
+  default) driving every card on the screen: spent/income/net, spending pace,
+  category donut, budgets, invested, biggest hits. Trends follows the same month.
 - **Ledger** — grouped by day with subtotals, searchable, filterable by
   kind, and every entry can be **edited** or **deleted**.
 - **Trends** — spend/received/invested per month, savings rate history,
-  investing breakdown, and month-over-month category movement.
+  investing breakdown, the highest and lowest month on record for each of the
+  three measures, income split by source, and month-over-month category
+  movement.
 - **Categories & budgets** — a monthly limit or target per category, and
   **custom categories** of any of the three kinds.
 - **Investments** — a third kind of money movement, tracked apart from spending
   (see [Investments are not spending](#investments-are-not-spending)).
+- **Recurring** — record an entry with Repeat switched on and it is posted again
+  on the same day every month, including for months the app was not opened. The
+  chip is on the edit sheet too, for making an entry you already have recurring.
+  Rules are listed and stopped under Settings, and stopping one leaves the entries
+  it already recorded untouched.
 - **Settings** — encryption status read from the file header, sample-data
   load/remove, and erase-everything.
 - **Assistant** — a fully local engine that answers from your own data, with a
@@ -41,7 +49,8 @@ rather than by a convention:
 - Transfers — the `transfer` direction and `transfer_group_id` column exist and
   are excluded from every total, but nothing creates such a row
 - Accounts management (three accounts are seeded; there is no UI to add or edit)
-- Recurring transactions, budget alerts, multi-currency
+- Weekly and yearly recurrence (only monthly rules are built), budget alerts,
+  multi-currency
 - The remote half of the assistant. Only the local engine and the redaction
   package exist, deliberately: the privacy boundary is worth building and
   testing before anything is allowed to cross it.
@@ -54,8 +63,8 @@ A pub workspace: three packages, one lockfile, one resolved dependency graph.
 | Path | What it is | lib (lines) | Tests |
 |------|-----------|------------:|------:|
 | [`packages/finance_assistant`](packages/finance_assistant/README.md) | Privacy boundary for LLM calls. Pure Dart, **zero runtime dependencies**. | 1,947 | 88 |
-| [`packages/finance_db`](packages/finance_db/README.md) | Drift schema, migrations, aggregation queries, passphrase handling. | 1,634 | 57 |
-| [`apps/finance_app`](apps/finance_app/README.md) | Flutter UI: five screens plus the shell and shared widgets. | 7,320 | 32 |
+| [`packages/finance_db`](packages/finance_db/README.md) | Drift schema, migrations, aggregation queries, passphrase handling. | 2,026 | 72 |
+| [`apps/finance_app`](apps/finance_app/README.md) | Flutter UI: five screens plus the shell and shared widgets. | 9,029 | 70 |
 
 `finance_db` line count excludes generated `.g.dart`. Each package README covers
 the reasoning behind that package's design; this file is the map.
@@ -109,8 +118,8 @@ green no-op is easy to mistake for a passing suite.
 
 ```sh
 cd packages/finance_assistant && dart test      # 88 tests — pure Dart, no Flutter SDK needed
-cd packages/finance_db        && flutter test   # 57 tests
-cd apps/finance_app           && flutter test   # 32 tests
+cd packages/finance_db        && flutter test   # 72 tests
+cd apps/finance_app           && flutter test   # 70 tests
 ```
 
 The same three gates CI runs:
@@ -201,9 +210,9 @@ exists to make that impossible:
 - investments do not count as spending, but do reduce account balances
 - investments are excluded from the daily pace curve and the spending donut
   (a diligent saver should not look like a big spender on SIP day)
-- the trend query returns spending and investing in **one** read, split by
-  direction, so the donut and the investing card cannot describe different
-  revisions of the ledger
+- the trend query returns spending, income, and investing in **one** read, split
+  by direction, so the donut, the income split, and the investing card cannot
+  describe different revisions of the ledger
 
 ## Money and dates
 

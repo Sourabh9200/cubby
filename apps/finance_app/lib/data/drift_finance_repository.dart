@@ -5,8 +5,8 @@ import 'finance_repository.dart';
 import 'finance_snapshot.dart';
 import 'models.dart';
 import 'row_mapper.dart';
-import 'snapshot_views.dart';
 import 'writers/category_writer.dart';
+import 'writers/recurring_writer.dart';
 import 'writers/sample_data_writer.dart';
 import 'writers/transaction_writer.dart';
 
@@ -25,6 +25,7 @@ class DriftFinanceRepository implements FinanceRepository {
        _clock = clock ?? DateTime.now,
        _transactions = TransactionWriter(db),
        _categories = CategoryWriter(db),
+       _recurring = RecurringWriter(db),
        _sampleData = SampleDataWriter(db);
 
   final db_layer.AppDatabase db;
@@ -34,6 +35,7 @@ class DriftFinanceRepository implements FinanceRepository {
 
   final TransactionWriter _transactions;
   final CategoryWriter _categories;
+  final RecurringWriter _recurring;
   final SampleDataWriter _sampleData;
 
   @override
@@ -45,6 +47,7 @@ class DriftFinanceRepository implements FinanceRepository {
             db.transactions,
             db.categories,
             db.accounts,
+            db.recurringRules,
             db.settingsEntries,
           ]),
         )
@@ -56,19 +59,22 @@ class DriftFinanceRepository implements FinanceRepository {
   /// Public so a test can assert on a snapshot without subscribing first.
   Future<FinanceSnapshot> buildSnapshot() async {
     final now = _clock();
-    final monthKey = SnapshotViews.monthKeyOf(now);
 
     final ledger = await db.watchLedger().first;
     final categoryRows = await db.watchCategories().first;
     final accountRows = await db.watchAccounts().first;
     final monthTotals = await db.watchMonthTotals().first;
     final trend = await db.watchCategoryTrend().first;
-    final daily = await db.watchDailyTotals(monthKey).first;
+    final daily = await db.watchDailyTotals().first;
+    final ruleRows = await db.watchRecurringRules().first;
 
     final spendByMonth = RowMapper.toCategorySpendByMonth(trend);
     // Split from the same read, so the donut and the investing card can never
     // describe different revisions of the ledger.
     final investedByMonth = RowMapper.toCategoryInvestmentByMonth(trend);
+    // Income comes from that same read too, so "income this month" and "income
+    // by source this month" are arithmetically the same number by construction.
+    final incomeByMonth = RowMapper.toCategoryIncomeByMonth(trend);
 
     return FinanceSnapshot(
       transactions: ledger.map(RowMapper.toTransaction).toList(growable: false),
@@ -84,10 +90,11 @@ class DriftFinanceRepository implements FinanceRepository {
       ),
       categorySpendByMonth: spendByMonth,
       categoryInvestmentByMonth: investedByMonth,
-      dailySpendByMonth: RowMapper.toDailySpendByMonth(
-        monthKey: monthKey,
-        rows: daily,
-      ),
+      categoryIncomeByMonth: incomeByMonth,
+      dailySpendByMonth: RowMapper.toDailySpendByMonth(daily),
+      recurringRules: ruleRows
+          .map(RowMapper.toRecurringRule)
+          .toList(growable: false),
       now: now,
     );
   }
@@ -153,6 +160,30 @@ class DriftFinanceRepository implements FinanceRepository {
   @override
   Future<void> deleteCategory(String categoryId) =>
       _categories.softDelete(categoryId);
+
+  @override
+  Future<void> addRecurringRule({
+    required String accountId,
+    required String categoryId,
+    required int amountMinor,
+    required TxDirection direction,
+    required DateTime startedOn,
+    String payee = '',
+    bool postMissedMonths = true,
+  }) async {
+    await _recurring.add(
+      accountId: accountId,
+      categoryId: categoryId,
+      amountMinor: amountMinor,
+      direction: direction,
+      startedOn: startedOn,
+      payee: payee,
+      postMissedMonths: postMissedMonths,
+    );
+  }
+
+  @override
+  Future<void> stopRecurringRule(String ruleId) => _recurring.stop(ruleId);
 
   @override
   Future<int> loadSampleData() => _sampleData.load();
