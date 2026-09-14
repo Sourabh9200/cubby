@@ -1,0 +1,29 @@
+# Line endings are pinned rather than left to each machine's core.autocrlf.
+#
+# The CI gate runs `dart format --output=none --set-exit-if-changed .` on Linux,
+# and Dart's formatter normalises line endings. A file committed with CRLF
+# therefore fails that gate on a checked-out tree where nothing is actually
+# wrong. `text=auto` also keeps a line-ending-only change from looking like a
+# real diff in review.
+* text=auto eol=lf
+
+# Windows-only scripts must stay CRLF to run at all.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Shell scripts stay LF on every platform. `android/gradlew` is a POSIX script
+# even on Windows, and a CRLF checkout makes it fail with a syntax error that
+# says nothing about line endings.
+gradlew text eol=lf
+
+# Never convert binaries. Gradle's wrapper JAR is committed here, and running
+# it through line-ending conversion corrupts it.
+*.jar binary
+*.jks binary
+*.keystore binary
+*.apk binary
+*.png binary
+*.jpg binary
+*.gif binary
+*.otf binary
+*.ttf binary
