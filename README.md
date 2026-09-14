@@ -150,8 +150,8 @@ green no-op is easy to mistake for a passing suite.
 
 ```sh
 cd packages/finance_assistant && dart test      # 88 tests — pure Dart, no Flutter SDK needed
-cd packages/finance_db        && flutter test   # 72 tests
-cd apps/finance_app           && flutter test   # 189 tests
+cd packages/finance_db        && flutter test   # 78 tests
+cd apps/finance_app           && flutter test   # 209 tests
 ```
 
 The same three gates CI runs:

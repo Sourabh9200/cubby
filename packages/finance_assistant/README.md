@@ -118,7 +118,7 @@ the UK. Re-decide this before distributing to other people.
 
 ```bash
 dart pub get
-dart test                          # 85 tests
+dart test                          # 88 tests
 dart analyze
 dart run ../../tool/generate_fixtures.dart   # regenerate checksum fixtures
 ```

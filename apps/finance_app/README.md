@@ -180,7 +180,7 @@ the screen you left.
 ## Testing
 
 ```sh
-flutter test        # 208 tests
+flutter test        # 209 tests
 ```
 
 - `app_smoke_test.dart` — screens render, tabs exist, nothing crashes on a fresh

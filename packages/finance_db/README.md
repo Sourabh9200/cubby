@@ -200,7 +200,7 @@ investment kind required a seed version bump and no schema change at all, and wh
 ## Testing
 
 ```sh
-flutter test        # 72 tests
+flutter test        # 78 tests
 ```
 
 - `ledger_test.dart`, `category_spend_test.dart`, `time_series_test.dart`,
@@ -211,6 +211,9 @@ flutter test        # 72 tests
 - `seeding_test.dart` — what a new install starts with
 - `date_helpers_test.dart` — month boundaries, leap days, ISO round-tripping, and
   the encryption header check
+- `backup_test.dart` — a snapshot restored into a fresh database, one restored
+  over a database that has drifted, a soft-deleted entry staying deleted, and a
+  file this build cannot interpret leaving the ledger intact
 
 Tests run against `AppDatabase.forTesting()`, which is an in-memory **unencrypted**
 database with the fast pragmas set. The cipher is only exercised on a device,
