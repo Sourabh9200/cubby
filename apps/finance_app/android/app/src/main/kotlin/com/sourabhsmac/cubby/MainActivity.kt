@@ -1,4 +1,4 @@
-package com.sourabhsmac.finance_app
+package com.sourabhsmac.cubby
 
 import io.flutter.embedding.android.FlutterActivity
 

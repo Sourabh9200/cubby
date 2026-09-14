@@ -56,7 +56,7 @@ class _RootState extends State<_Root> {
           snapshot: snapshot ?? FinanceSnapshot.empty(DateTime.now()),
           repository: widget.repository,
           child: MaterialApp(
-            title: 'Finance',
+            title: 'Cubby',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.light(),
             darkTheme: AppTheme.dark(),

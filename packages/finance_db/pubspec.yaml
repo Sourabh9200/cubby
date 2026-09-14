@@ -1,6 +1,6 @@
 name: finance_db
 description: >-
-  Local encrypted storage for the finance app: drift tables, DAOs, migrations,
+  Local encrypted storage for Cubby: drift tables, DAOs, migrations,
   and the passphrase handling that keys SQLite3MultipleCiphers.
 version: 0.1.0
 publish_to: none

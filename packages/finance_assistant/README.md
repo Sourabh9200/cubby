@@ -1,6 +1,6 @@
 # finance_assistant
 
-Privacy boundary for every LLM call in the finance app. Redacts PII before text
+Privacy boundary for every LLM call in Cubby. Redacts PII before text
 leaves the device, generalizes aggregates before they are transmitted, and
 re-hydrates the model's reply locally so the user still gets a natural answer.
 

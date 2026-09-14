@@ -1,6 +1,6 @@
 # finance_db
 
-Local encrypted storage for the finance app: drift tables, aggregation queries,
+Local encrypted storage for Cubby: drift tables, aggregation queries,
 migrations, and the passphrase handling that keys SQLite3MultipleCiphers.
 
 **Everything the UI knows about money comes from here.** The app never sees a

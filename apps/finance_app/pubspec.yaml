@@ -1,5 +1,5 @@
 name: finance_app
-description: "Personal finance app — local-first, encrypted, Android. Track spends, see trends, ask questions privately."
+description: "Cubby — local-first, encrypted, Android. Track spends, see trends, ask questions privately."
 publish_to: 'none'
 resolution: workspace
 version: 1.0.0+1

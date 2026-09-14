@@ -1,7 +1,8 @@
-# FinanceApp
+# Cubby
 
-A local-first personal finance app for Android. Your ledger lives in a single
-encrypted SQLite file on your phone. There is no server, no account, and no sync.
+Cubby is a local-first personal finance app for Android. Your ledger lives in a
+single encrypted SQLite file on your phone. There is no server, no account, and
+no sync.
 
 Three properties are treated as non-negotiable, and each is pinned by a test
 rather than by a convention:

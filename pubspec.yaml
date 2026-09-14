@@ -1,5 +1,5 @@
 name: finance_app_workspace
-description: Personal finance app — pub workspace root. Android-first, local-first, encrypted-at-rest.
+description: Cubby — pub workspace root. Android-first, local-first, encrypted-at-rest.
 publish_to: none
 
 environment:
